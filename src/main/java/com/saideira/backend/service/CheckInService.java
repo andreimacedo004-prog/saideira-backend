@@ -1,0 +1,276 @@
+package com.saideira.backend.service;
+
+import com.saideira.backend.dto.CheckInResponse;
+import com.saideira.backend.dto.ReacaoResumo;
+import com.saideira.backend.dto.RegistrarCheckInRequest;
+import com.saideira.backend.exception.AcessoNegadoException;
+import com.saideira.backend.exception.RecursoNaoEncontradoException;
+import com.saideira.backend.model.Beer;
+import com.saideira.backend.model.Challenge;
+import com.saideira.backend.model.CheckIn;
+import com.saideira.backend.model.FriendGroup;
+import com.saideira.backend.model.User;
+import com.saideira.backend.repository.BeerRepository;
+import com.saideira.backend.repository.CheckInRepository;
+import com.saideira.backend.repository.CommentRepository;
+import com.saideira.backend.repository.ReactionRepository;
+import com.saideira.backend.util.Normalizador;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Check-ins: registrar, apagar e montar o feed.
+ *
+ * Regras de registro (todas testadas em CheckInServiceTest):
+ *  - so membro do grupo faz check-in no desafio;
+ *  - o role precisa cair dentro do periodo do desafio;
+ *  - nada de check-in no futuro, e no maximo 24h retroativo;
+ *  - intervalo minimo entre dois check-ins da mesma pessoa (anti-farm);
+ *  - so da para marcar amigos do grupo, e nao da para se marcar.
+ */
+@Service
+public class CheckInService {
+
+    // Tolerancia para relogio de celular um pouco adiantado
+    private static final Duration TOLERANCIA_FUTURO = Duration.ofMinutes(5);
+    private static final DateTimeFormatter HORA = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter DATA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    private final CheckInRepository checkInRepository;
+    private final ChallengeService challengeService;
+    private final BeerRepository beerRepository;
+    private final UserService userService;
+    private final ReactionRepository reactionRepository;
+    private final CommentRepository commentRepository;
+    private final ScoreService scoreService;
+    private final Clock clock;
+    private final Duration intervaloMinimo;
+    private final Duration maxRetroativo;
+
+    public CheckInService(
+        CheckInRepository checkInRepository,
+        ChallengeService challengeService,
+        BeerRepository beerRepository,
+        UserService userService,
+        ReactionRepository reactionRepository,
+        CommentRepository commentRepository,
+        ScoreService scoreService,
+        Clock clock,
+        @Value("${app.checkin.intervalo-minimo-minutos}") long intervaloMinimoMinutos,
+        @Value("${app.checkin.max-horas-retroativo}") long maxHorasRetroativo
+    ) {
+        this.checkInRepository = checkInRepository;
+        this.challengeService = challengeService;
+        this.beerRepository = beerRepository;
+        this.userService = userService;
+        this.reactionRepository = reactionRepository;
+        this.commentRepository = commentRepository;
+        this.scoreService = scoreService;
+        this.clock = clock;
+        this.intervaloMinimo = Duration.ofMinutes(intervaloMinimoMinutos);
+        this.maxRetroativo = Duration.ofHours(maxHorasRetroativo);
+    }
+
+    @Transactional
+    public CheckInResponse registrar(Long autorId, Long desafioId, RegistrarCheckInRequest req) {
+        Challenge desafio = challengeService.buscarDoMembro(desafioId, autorId);
+        LocalDateTime agora = LocalDateTime.now(clock);
+        LocalDateTime feitoEm = req.feitoEm() != null ? req.feitoEm() : agora;
+
+        validarHorario(desafio, feitoEm, agora);
+        validarIntervalo(autorId, desafio.getId(), feitoEm);
+
+        CheckIn checkIn = new CheckIn();
+        checkIn.setAutor(userService.buscarPorId(autorId));
+        checkIn.setDesafio(desafio);
+        checkIn.setTipo(req.tipo());
+        checkIn.setLocal(req.local().trim());
+        checkIn.setLocalNormalizado(Normalizador.normalizar(req.local()));
+        checkIn.setFotoUrl(vazioViraNulo(req.fotoUrl()));
+        checkIn.setLegenda(vazioViraNulo(req.legenda()));
+        checkIn.setFeitoEm(feitoEm);
+        checkIn.setAmigosMarcados(resolverAmigos(req.amigosIds(), autorId, desafio.getGrupo()));
+        checkIn.setCervejas(resolverCervejas(req.cervejaIds()));
+
+        checkIn = checkInRepository.save(checkIn);
+
+        List<CheckIn> doDesafio = checkInRepository.findDoDesafio(desafio.getId());
+        return montar(doDesafio, List.of(checkIn), autorId).get(0);
+    }
+
+    /** Feed do desafio, do role mais recente para o mais antigo. */
+    @Transactional(readOnly = true)
+    public List<CheckInResponse> feed(Long desafioId, Long usuarioId) {
+        Challenge desafio = challengeService.buscarDoMembro(desafioId, usuarioId);
+        List<CheckIn> doDesafio = checkInRepository.findDoDesafio(desafio.getId());
+        return montar(doDesafio, doDesafio, usuarioId);
+    }
+
+    @Transactional(readOnly = true)
+    public CheckInResponse detalhe(Long checkInId, Long usuarioId) {
+        CheckIn checkIn = buscarVisivel(checkInId, usuarioId);
+        List<CheckIn> doDesafio = checkInRepository.findDoDesafio(checkIn.getDesafio().getId());
+        return montar(doDesafio, List.of(checkIn), usuarioId).get(0);
+    }
+
+    /** So o autor apaga. Reacoes e comentarios vao junto (ON DELETE CASCADE). */
+    @Transactional
+    public void remover(Long checkInId, Long usuarioId) {
+        CheckIn checkIn = checkInRepository.findById(checkInId)
+            .orElseThrow(() -> new RecursoNaoEncontradoException("Check-in nao encontrado"));
+
+        if (!checkIn.getAutor().getId().equals(usuarioId)) {
+            throw new AcessoNegadoException("So quem fez o check-in pode apagar");
+        }
+        checkInRepository.delete(checkIn);
+    }
+
+    /**
+     * Busca um check-in exigindo que o usuario seja do grupo do desafio (senao 403).
+     * Usado por reacoes e comentarios.
+     */
+    @Transactional(readOnly = true)
+    public CheckIn buscarVisivel(Long checkInId, Long usuarioId) {
+        CheckIn checkIn = checkInRepository.findById(checkInId)
+            .orElseThrow(() -> new RecursoNaoEncontradoException("Check-in nao encontrado"));
+
+        if (!checkIn.getDesafio().getGrupo().temMembro(usuarioId)) {
+            throw new AcessoNegadoException("Voce nao faz parte do grupo deste check-in");
+        }
+        return checkIn;
+    }
+
+    // ------------------------------------------------------------------
+    // Regras
+    // ------------------------------------------------------------------
+
+    private void validarHorario(Challenge desafio, LocalDateTime feitoEm, LocalDateTime agora) {
+        if (feitoEm.isAfter(agora.plus(TOLERANCIA_FUTURO))) {
+            throw new IllegalArgumentException("Nao da para fazer check-in de um role que ainda nao aconteceu");
+        }
+        if (feitoEm.isBefore(agora.minus(maxRetroativo))) {
+            throw new IllegalArgumentException(
+                "Da para registrar roles de ate " + maxRetroativo.toHours() + "h atras"
+            );
+        }
+        if (feitoEm.toLocalDate().isBefore(desafio.getDataInicio())) {
+            throw new IllegalArgumentException(
+                "O desafio ainda nao comecou — comeca em " + desafio.getDataInicio().format(DATA)
+            );
+        }
+        if (feitoEm.toLocalDate().isAfter(desafio.getDataFim())) {
+            throw new IllegalArgumentException(
+                "O desafio acabou em " + desafio.getDataFim().format(DATA)
+            );
+        }
+    }
+
+    private void validarIntervalo(Long autorId, Long desafioId, LocalDateTime feitoEm) {
+        checkInRepository.findConflitante(
+            autorId, desafioId, feitoEm.minus(intervaloMinimo), feitoEm.plus(intervaloMinimo)
+        ).ifPresent(conflito -> {
+            throw new IllegalArgumentException(
+                "Voce ja fez check-in as " + conflito.getFeitoEm().format(HORA)
+                + ". Precisa de pelo menos " + descrever(intervaloMinimo) + " entre um check-in e outro."
+            );
+        });
+    }
+
+    private Set<User> resolverAmigos(List<Long> amigosIds, Long autorId, FriendGroup grupo) {
+        Set<User> amigos = new LinkedHashSet<>();
+        if (amigosIds == null) {
+            return amigos;
+        }
+        for (Long amigoId : new LinkedHashSet<>(amigosIds)) {
+            if (amigoId == null) {
+                continue;
+            }
+            if (amigoId.equals(autorId)) {
+                throw new IllegalArgumentException("Nao precisa se marcar no proprio check-in");
+            }
+            User amigo = grupo.getMembros().stream()
+                .filter(m -> m.getId().equals(amigoId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("So da para marcar quem esta no grupo"));
+            amigos.add(amigo);
+        }
+        return amigos;
+    }
+
+    private Set<Beer> resolverCervejas(List<Long> cervejaIds) {
+        if (cervejaIds == null || cervejaIds.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+        Set<Long> ids = new LinkedHashSet<>(cervejaIds);
+        ids.remove(null);
+        List<Beer> encontradas = beerRepository.findAllById(ids);
+        if (encontradas.size() != ids.size()) {
+            throw new RecursoNaoEncontradoException("Cerveja nao encontrada no catalogo");
+        }
+        return new LinkedHashSet<>(encontradas);
+    }
+
+    // ------------------------------------------------------------------
+    // Montagem do feed
+    // ------------------------------------------------------------------
+
+    /**
+     * Monta os cards de 'alvo'. Recebe tambem todos os check-ins do desafio
+     * porque os pontos de um check-in dependem do historico da pessoa.
+     * Reacoes e comentarios vem em uma consulta agrupada cada, nao uma por card.
+     */
+    private List<CheckInResponse> montar(List<CheckIn> doDesafio, List<CheckIn> alvo, Long usuarioId) {
+        if (alvo.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, ScoreService.PontosCheckIn> pontos = scoreService.pontuarCheckIns(doDesafio);
+        List<Long> ids = alvo.stream().map(CheckIn::getId).toList();
+        Map<Long, List<ReacaoResumo>> reacoes = ReacaoResumo.agrupar(
+            reactionRepository.resumoPorCheckIn(ids, usuarioId)
+        );
+        Map<Long, Long> comentarios = contar(commentRepository.contarPorCheckIn(ids));
+
+        return alvo.stream()
+            .map(c -> CheckInResponse.de(
+                c,
+                pontos.get(c.getId()),
+                reacoes.getOrDefault(c.getId(), List.of()),
+                comentarios.getOrDefault(c.getId(), 0L)
+            ))
+            .toList();
+    }
+
+    private static Map<Long, Long> contar(Collection<Object[]> linhas) {
+        Map<Long, Long> mapa = new HashMap<>();
+        for (Object[] linha : linhas) {
+            mapa.put((Long) linha[0], ((Number) linha[1]).longValue());
+        }
+        return mapa;
+    }
+
+    /** 120 min -> "2h", 90 -> "1h30", 45 -> "45min" */
+    static String descrever(Duration duracao) {
+        long horas = duracao.toHours();
+        long minutos = duracao.toMinutesPart();
+        if (horas == 0) {
+            return minutos + "min";
+        }
+        return minutos == 0 ? horas + "h" : horas + "h" + String.format("%02d", minutos);
+    }
+
+    private static String vazioViraNulo(String texto) {
+        return texto == null || texto.isBlank() ? null : texto.trim();
+    }
+}
