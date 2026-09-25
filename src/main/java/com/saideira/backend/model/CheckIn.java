@@ -6,7 +6,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -68,13 +70,10 @@ public class CheckIn {
     )
     private Set<User> amigosMarcados = new LinkedHashSet<>();
 
-    @ManyToMany
-    @JoinTable(
-        name = "check_in_cervejas",
-        joinColumns = @JoinColumn(name = "check_in_id"),
-        inverseJoinColumns = @JoinColumn(name = "beer_id")
-    )
-    private Set<Beer> cervejas = new LinkedHashSet<>();
+    // Cervejas do role, cada uma com formato e quantidade (ver CervejaDoRole)
+    @ElementCollection
+    @CollectionTable(name = "check_in_cervejas", joinColumns = @JoinColumn(name = "check_in_id"))
+    private List<CervejaDoRole> cervejas = new ArrayList<>();
 
     public enum TipoRole {
         BAR, FESTA, CHURRASCO, SHOW, VISITA, OUTRO

@@ -2,6 +2,7 @@ package com.saideira.backend.controller;
 
 import com.saideira.backend.dto.RegistrarCheckInRequest;
 import com.saideira.backend.dto.RegrasResponse;
+import com.saideira.backend.model.FormatoCerveja;
 import com.saideira.backend.service.ScoreService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Arrays;
 import java.util.Map;
 
 /** Endpoints publicos: health check e as regras de pontuacao. */
@@ -29,7 +31,10 @@ public class InfoController {
             ScoreService.PONTOS_POR_LUGAR_NOVO,
             intervaloMinimoMinutos,
             maxHorasRetroativo,
-            RegistrarCheckInRequest.MAX_CERVEJAS
+            RegistrarCheckInRequest.MAX_CERVEJAS,
+            Arrays.stream(FormatoCerveja.values())
+                .map(f -> new RegrasResponse.Formato(f, f.getRotulo(), f.getMililitros()))
+                .toList()
         );
     }
 

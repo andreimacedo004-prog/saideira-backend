@@ -18,7 +18,7 @@ src/main/java/com/saideira/backend/
 ├── exception/    → Tratamento centralizado de erros
 └── util/         → Normalizador de texto
 
-src/main/resources/db/migration/ → Migrations Flyway (V1 esquema, V2 catálogo de cervejas)
+src/main/resources/db/migration/ → Migrations Flyway (V1 esquema, V2 catálogo de cervejas, V3 formato e quantidade)
 src/test/java/                   → Testes unitários
 testar_saideira.ps1              → Passeio completo pela API, em PowerShell
 ```
@@ -43,7 +43,7 @@ Calculada **na hora**, a partir dos check-ins. Não existe coluna de pontos no b
 | O quê | Pontos |
 |---|---|
 | Check-in | +10 |
-| Cerveja que a pessoa ainda não tinha registrado no desafio | +5 cada |
+| Cerveja que a pessoa ainda não tinha registrado no desafio | +5 cada (a quantidade não conta) |
 | Amigo marcado | +3 cada |
 | Lugar onde a pessoa ainda não tinha feito check-in no desafio | +5 |
 
@@ -52,6 +52,14 @@ Calculada **na hora**, a partir dos check-ins. Não existe coluna de pontos no b
 - A novidade é por pessoa: a cerveja que a amiga já provou continua nova para você.
 
 Pontua rolê, variedade e galera, nunca quantidade de bebida.
+
+### Formato e quantidade ("soma escondida")
+
+Cada cerveja do check-in vai com **formato** (`LATA` 350 ml, `LATAO` 473, `LONG_NECK` 330, `GARRAFA` 600, `LITRAO` 1000, `CHOPP` 300) e **quantidade** (1 a 20). Esses dados:
+
+- **não valem ponto**: 6 latões da mesma cerveja continuam sendo 1 cerveja nova;
+- **não aparecem no feed**;
+- alimentam só a **retrospectiva** (`GET /api/desafios/{id}/retrospectiva`). Ali cada pessoa vê o próprio volume e o **total coletivo** da galera. Não existe ranking de quem bebeu mais, de propósito.
 
 ### Anti-farm
 
@@ -71,7 +79,7 @@ Tudo exige `Authorization: Bearer <token>`, exceto `/api/auth/**`, `/api/health`
 |---|---|---|
 | POST | `/api/auth/cadastro` | Cria conta (exige `maiorDeIdade: true`) e devolve token |
 | POST | `/api/auth/login` | Devolve token (vale 30 dias) |
-| GET | `/api/regras` | Pontuação e limites do check-in |
+| GET | `/api/regras` | Pontuação, limites do check-in e os formatos com o volume de cada um |
 | GET | `/api/usuarios/eu` | Meu perfil |
 | PUT | `/api/usuarios/eu/perfil` | Nome, bio e foto |
 | POST | `/api/grupos` | Cria grupo |
@@ -84,6 +92,7 @@ Tudo exige `Authorization: Bearer <token>`, exceto `/api/auth/**`, `/api/health`
 | GET | `/api/desafios` | Desafios de todos os meus grupos, ativos primeiro (tela inicial) |
 | GET | `/api/desafios/{id}` | Detalhe, com status `EM_BREVE` / `ATIVO` / `ENCERRADO` |
 | GET | `/api/desafios/{id}/ranking` | Ranking com o detalhe dos pontos |
+| GET | `/api/desafios/{id}/retrospectiva` | Meus litros e cervejas + total da galera (para o Wrapped) |
 | POST | `/api/desafios/{id}/checkins` | Faz check-in |
 | GET | `/api/desafios/{id}/checkins` | Feed, já com pontos, reações e nº de comentários |
 | GET | `/api/checkins/{id}` | Um check-in |
@@ -106,7 +115,9 @@ POST /api/desafios/1/checkins
   "fotoUrl": "https://res.cloudinary.com/.../foto.jpg",
   "legenda": "Só mais uma",
   "amigosIds": [2, 3],
-  "cervejaIds": [15],
+  "cervejas": [
+    { "cervejaId": 15, "formato": "GARRAFA", "quantidade": 2 }
+  ],
   "feitoEm": "2026-11-06T23:30:00"
 }
 ```

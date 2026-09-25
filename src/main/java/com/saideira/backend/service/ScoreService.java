@@ -1,6 +1,6 @@
 package com.saideira.backend.service;
 
-import com.saideira.backend.model.Beer;
+import com.saideira.backend.model.CervejaDoRole;
 import com.saideira.backend.model.CheckIn;
 import com.saideira.backend.model.User;
 import org.springframework.stereotype.Service;
@@ -77,8 +77,9 @@ public class ScoreService {
 
             Set<Long> cervejasDoAutor = cervejasJaRegistradas.computeIfAbsent(autorId, id -> new HashSet<>());
             int cervejasNovas = 0;
-            for (Beer cerveja : checkIn.getCervejas()) {
-                if (cervejasDoAutor.add(cerveja.getId())) {
+            // Quantidade e formato nao contam: 5 latas da mesma cerveja = 1 cerveja nova
+            for (CervejaDoRole item : checkIn.getCervejas()) {
+                if (cervejasDoAutor.add(item.getCerveja().getId())) {
                     cervejasNovas++;
                 }
             }

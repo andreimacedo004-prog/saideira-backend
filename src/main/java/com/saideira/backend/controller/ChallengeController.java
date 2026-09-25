@@ -3,8 +3,10 @@ package com.saideira.backend.controller;
 import com.saideira.backend.dto.CriarDesafioRequest;
 import com.saideira.backend.dto.DesafioResponse;
 import com.saideira.backend.dto.RankingItemResponse;
+import com.saideira.backend.dto.RetrospectivaResponse;
 import com.saideira.backend.security.UsuarioAutenticado;
 import com.saideira.backend.service.ChallengeService;
+import com.saideira.backend.service.RetrospectivaService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,9 +20,11 @@ import java.util.List;
 public class ChallengeController {
 
     private final ChallengeService challengeService;
+    private final RetrospectivaService retrospectivaService;
 
-    public ChallengeController(ChallengeService challengeService) {
+    public ChallengeController(ChallengeService challengeService, RetrospectivaService retrospectivaService) {
         this.challengeService = challengeService;
+        this.retrospectivaService = retrospectivaService;
     }
 
     @PostMapping("/grupos/{grupoId}/desafios")
@@ -53,6 +57,17 @@ public class ChallengeController {
         @AuthenticationPrincipal UsuarioAutenticado logado, @PathVariable Long desafioId
     ) {
         return ResponseEntity.ok(challengeService.detalhe(desafioId, logado.getId()));
+    }
+
+    /**
+     * Numeros da retrospectiva: meu consumo e o total da galera.
+     * Nao existe versao "por pessoa" para os outros verem — de proposito.
+     */
+    @GetMapping("/desafios/{desafioId}/retrospectiva")
+    public ResponseEntity<RetrospectivaResponse> retrospectiva(
+        @AuthenticationPrincipal UsuarioAutenticado logado, @PathVariable Long desafioId
+    ) {
+        return ResponseEntity.ok(retrospectivaService.doDesafio(desafioId, logado.getId()));
     }
 
     @GetMapping("/desafios/{desafioId}/ranking")

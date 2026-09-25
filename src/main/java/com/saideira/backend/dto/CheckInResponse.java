@@ -39,8 +39,9 @@ public record CheckInResponse(
                 .map(UsuarioResumo::de)
                 .sorted(Comparator.comparing(UsuarioResumo::nome, String.CASE_INSENSITIVE_ORDER))
                 .toList(),
+            // So o nome da cerveja vai para o feed; formato e quantidade ficam escondidos
             c.getCervejas().stream()
-                .map(CervejaResponse::de)
+                .map(item -> CervejaResponse.de(item.getCerveja()))
                 .sorted(Comparator.comparing(CervejaResponse::nome, String.CASE_INSENSITIVE_ORDER))
                 .toList(),
             PontosResponse.de(pontos),

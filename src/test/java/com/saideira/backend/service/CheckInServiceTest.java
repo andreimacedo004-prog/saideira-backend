@@ -1,12 +1,14 @@
 package com.saideira.backend.service;
 
 import com.saideira.backend.dto.CheckInResponse;
+import com.saideira.backend.dto.ItemCervejaRequest;
 import com.saideira.backend.dto.RegistrarCheckInRequest;
 import com.saideira.backend.exception.AcessoNegadoException;
 import com.saideira.backend.exception.RecursoNaoEncontradoException;
 import com.saideira.backend.model.Beer;
 import com.saideira.backend.model.Challenge;
 import com.saideira.backend.model.CheckIn;
+import com.saideira.backend.model.FormatoCerveja;
 import com.saideira.backend.model.FriendGroup;
 import com.saideira.backend.model.User;
 import com.saideira.backend.repository.BeerRepository;
@@ -105,7 +107,13 @@ class CheckInServiceTest {
         return u;
     }
 
-    private RegistrarCheckInRequest pedido(LocalDateTime feitoEm, List<Long> amigos, List<Long> cervejas) {
+    private RegistrarCheckInRequest pedido(LocalDateTime feitoEm, List<Long> amigos, List<Long> cervejaIds) {
+        List<ItemCervejaRequest> cervejas = cervejaIds == null ? null
+            : cervejaIds.stream().map(id -> new ItemCervejaRequest(id, FormatoCerveja.LATA, 1)).toList();
+        return pedidoComCervejas(feitoEm, amigos, cervejas);
+    }
+
+    private RegistrarCheckInRequest pedidoComCervejas(LocalDateTime feitoEm, List<Long> amigos, List<ItemCervejaRequest> cervejas) {
         return new RegistrarCheckInRequest(
             CheckIn.TipoRole.BAR, "Bar do Zé", null, "Saideira!", feitoEm, amigos, cervejas
         );
@@ -203,6 +211,37 @@ class CheckInServiceTest {
 
         assertThatThrownBy(() -> service.registrar(1L, 100L, pedido(null, null, List.of(12345L))))
             .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
+
+    @Test
+    @DisplayName("Formato e quantidade ficam gravados no check-in (para a retrospectiva)")
+    void gravaFormatoEQuantidade() {
+        Beer heineken = new Beer();
+        heineken.setId(7L);
+        heineken.setNome("Heineken");
+        when(beerRepository.findAllById(any())).thenReturn(List.of(heineken));
+
+        CheckInResponse resposta = service.registrar(1L, 100L,
+            pedidoComCervejas(null, null, List.of(new ItemCervejaRequest(7L, FormatoCerveja.GARRAFA, 3))));
+
+        assertThat(salvo.getCervejas()).singleElement().satisfies(item -> {
+            assertThat(item.getFormato()).isEqualTo(FormatoCerveja.GARRAFA);
+            assertThat(item.getQuantidade()).isEqualTo(3);
+            assertThat(item.mililitros()).isEqualTo(1800);
+        });
+        // 3 garrafas continuam valendo so +5 (uma cerveja nova)
+        assertThat(resposta.pontos().total()).isEqualTo(10 + 5 + 5);
+    }
+
+    @Test
+    @DisplayName("A mesma cerveja duas vezes no mesmo check-in e recusada")
+    void cervejaRepetidaNoCheckIn() {
+        assertThatThrownBy(() -> service.registrar(1L, 100L, pedidoComCervejas(null, null, List.of(
+            new ItemCervejaRequest(7L, FormatoCerveja.LATA, 1),
+            new ItemCervejaRequest(7L, FormatoCerveja.GARRAFA, 1)
+        ))))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("uma vez por check-in");
     }
 
     @Test

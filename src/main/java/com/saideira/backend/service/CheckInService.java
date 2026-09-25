@@ -1,11 +1,13 @@
 package com.saideira.backend.service;
 
 import com.saideira.backend.dto.CheckInResponse;
+import com.saideira.backend.dto.ItemCervejaRequest;
 import com.saideira.backend.dto.ReacaoResumo;
 import com.saideira.backend.dto.RegistrarCheckInRequest;
 import com.saideira.backend.exception.AcessoNegadoException;
 import com.saideira.backend.exception.RecursoNaoEncontradoException;
 import com.saideira.backend.model.Beer;
+import com.saideira.backend.model.CervejaDoRole;
 import com.saideira.backend.model.Challenge;
 import com.saideira.backend.model.CheckIn;
 import com.saideira.backend.model.FriendGroup;
@@ -23,6 +25,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -102,7 +105,7 @@ public class CheckInService {
         checkIn.setLegenda(vazioViraNulo(req.legenda()));
         checkIn.setFeitoEm(feitoEm);
         checkIn.setAmigosMarcados(resolverAmigos(req.amigosIds(), autorId, desafio.getGrupo()));
-        checkIn.setCervejas(resolverCervejas(req.cervejaIds()));
+        checkIn.setCervejas(resolverCervejas(req.cervejas()));
 
         checkIn = checkInRepository.save(checkIn);
 
@@ -209,17 +212,29 @@ public class CheckInService {
         return amigos;
     }
 
-    private Set<Beer> resolverCervejas(List<Long> cervejaIds) {
-        if (cervejaIds == null || cervejaIds.isEmpty()) {
-            return new LinkedHashSet<>();
+    private List<CervejaDoRole> resolverCervejas(List<ItemCervejaRequest> itens) {
+        List<CervejaDoRole> cervejas = new ArrayList<>();
+        if (itens == null || itens.isEmpty()) {
+            return cervejas;
         }
-        Set<Long> ids = new LinkedHashSet<>(cervejaIds);
-        ids.remove(null);
-        List<Beer> encontradas = beerRepository.findAllById(ids);
+
+        Set<Long> ids = new LinkedHashSet<>();
+        for (ItemCervejaRequest item : itens) {
+            if (!ids.add(item.cervejaId())) {
+                throw new IllegalArgumentException("Cada cerveja entra uma vez por check-in — ajuste a quantidade dela");
+            }
+        }
+
+        Map<Long, Beer> encontradas = new HashMap<>();
+        beerRepository.findAllById(ids).forEach(b -> encontradas.put(b.getId(), b));
         if (encontradas.size() != ids.size()) {
             throw new RecursoNaoEncontradoException("Cerveja não encontrada no catálogo");
         }
-        return new LinkedHashSet<>(encontradas);
+
+        for (ItemCervejaRequest item : itens) {
+            cervejas.add(new CervejaDoRole(encontradas.get(item.cervejaId()), item.formato(), item.quantidade()));
+        }
+        return cervejas;
     }
 
     // ------------------------------------------------------------------

@@ -1,6 +1,8 @@
 package com.saideira.backend.service;
 
 import com.saideira.backend.model.Beer;
+import com.saideira.backend.model.CervejaDoRole;
+import com.saideira.backend.model.FormatoCerveja;
 import com.saideira.backend.model.CheckIn;
 import com.saideira.backend.model.User;
 import com.saideira.backend.util.Normalizador;
@@ -42,7 +44,7 @@ class ScoreServiceTest {
         c.setLocal(local);
         c.setLocalNormalizado(Normalizador.normalizar(local));
         c.setFeitoEm(feitoEm);
-        c.getCervejas().addAll(cervejas);
+        cervejas.forEach(b -> c.getCervejas().add(new CervejaDoRole(b, FormatoCerveja.LATA, 1)));
         c.getAmigosMarcados().addAll(amigos);
         return c;
     }
@@ -85,6 +87,20 @@ class ScoreServiceTest {
 
         assertThat(pontos.get(primeiro.getId()).cervejasNovas()).isEqualTo(1);
         assertThat(pontos.get(segundo.getId()).cervejasNovas()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Quantidade e formato nao mudam os pontos: 6 latoes da mesma cerveja = 1 cerveja nova")
+    void quantidadeNaoPontua() {
+        User ana = usuario(1, "Ana");
+        CheckIn umaLata = checkIn(ana, "Bar A", SEXTA, List.of(), List.of());
+        umaLata.getCervejas().add(new CervejaDoRole(cerveja(1), FormatoCerveja.LATA, 1));
+        CheckIn seisLatoes = checkIn(usuario(2, "Bia"), "Bar A", SEXTA, List.of(), List.of());
+        seisLatoes.getCervejas().add(new CervejaDoRole(cerveja(1), FormatoCerveja.LATAO, 6));
+
+        Map<Long, ScoreService.PontosCheckIn> pontos = scoreService.pontuarCheckIns(List.of(umaLata, seisLatoes));
+
+        assertThat(pontos.get(umaLata.getId()).total()).isEqualTo(pontos.get(seisLatoes.getId()).total());
     }
 
     @Test

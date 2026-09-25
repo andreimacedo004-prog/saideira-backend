@@ -59,7 +59,7 @@ $checkIn = Chamar Post "/api/desafios/$($desafio.id)/checkins" $tokenAna @{
     local      = "Bar do Zé"
     legenda    = "Só mais uma"
     amigosIds  = @($beto.usuario.id)
-    cervejaIds = @($heineken.id)
+    cervejas   = @(@{ cervejaId = $heineken.id; formato = "GARRAFA"; quantidade = 2 })
 }
 Write-Host "pontos do check-in: $($checkIn.pontos.total)"
 
@@ -82,7 +82,11 @@ Chamar Get "/api/desafios/$($desafio.id)/checkins" $tokenBeto | ForEach-Object {
     Write-Host "$($_.autor.nome) @ $($_.local) [$($_.tipo)] +$($_.pontos.total) pts | $($_.totalComentarios) comentario(s)"
 }
 
-Write-Host "`n=== 10) ranking ==="
+Write-Host "`n=== 10) retrospectiva da Ana (soma escondida: 2 garrafas = 1,2 L) ==="
+$retro = Chamar Get "/api/desafios/$($desafio.id)/retrospectiva" $tokenAna
+Write-Host "Ana: $($retro.eu.litros) L em $($retro.eu.unidades) unidade(s) | galera: $($retro.grupo.litros) L"
+
+Write-Host "`n=== 11) ranking ==="
 Chamar Get "/api/desafios/$($desafio.id)/ranking" $tokenBeto | ForEach-Object {
     Write-Host "$($_.posicao). $($_.usuario.nome) - $($_.pontos) pts ($($_.checkIns) check-in(s))"
 }
