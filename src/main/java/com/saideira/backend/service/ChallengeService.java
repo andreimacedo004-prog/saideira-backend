@@ -17,7 +17,10 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
-/** Desafios: criar, listar e montar o ranking. */
+/**
+ * Desafios: criar, listar, montar o ranking e, para quem criou,
+ * mudar o nome ou apagar.
+ */
 @Service
 public class ChallengeService {
 
@@ -95,6 +98,26 @@ public class ChallengeService {
         return DesafioResponse.de(buscarDoMembro(desafioId, usuarioId), LocalDate.now(clock));
     }
 
+    /** Muda so o nome. So quem criou o desafio pode. */
+    @Transactional
+    public DesafioResponse renomear(Long desafioId, Long usuarioId, String nome) {
+        Challenge desafio = buscarDoCriador(desafioId, usuarioId, "Só quem criou o desafio pode mudar o nome");
+        desafio.setNome(nome.trim());
+        return DesafioResponse.de(desafio, LocalDate.now(clock));
+    }
+
+    /**
+     * Apaga o desafio. So quem criou pode.
+     * O banco leva junto os check-ins dele e, com eles, cervejas, amigos
+     * marcados, reacoes e comentarios (ON DELETE CASCADE no V1).
+     * Grupo e contas nao sao tocados.
+     */
+    @Transactional
+    public void apagar(Long desafioId, Long usuarioId) {
+        Challenge desafio = buscarDoCriador(desafioId, usuarioId, "Só quem criou o desafio pode apagar");
+        challengeRepository.delete(desafio);
+    }
+
     /** Ranking do desafio. Todo membro do grupo aparece, mesmo com zero pontos. */
     @Transactional(readOnly = true)
     public List<RankingItemResponse> ranking(Long desafioId, Long usuarioId) {
@@ -117,6 +140,15 @@ public class ChallengeService {
 
         if (!desafio.getGrupo().temMembro(usuarioId)) {
             throw new AcessoNegadoException("Você não faz parte do grupo deste desafio");
+        }
+        return desafio;
+    }
+
+    /** Membro do grupo (senao 403 de buscarDoMembro) e autor do desafio (senao 403 com a mensagem dada). */
+    private Challenge buscarDoCriador(Long desafioId, Long usuarioId, String mensagemSeNaoFor) {
+        Challenge desafio = buscarDoMembro(desafioId, usuarioId);
+        if (!desafio.getCriadoPor().getId().equals(usuarioId)) {
+            throw new AcessoNegadoException(mensagemSeNaoFor);
         }
         return desafio;
     }

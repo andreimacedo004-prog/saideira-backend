@@ -3,6 +3,7 @@ package com.saideira.backend.controller;
 import com.saideira.backend.dto.CriarDesafioRequest;
 import com.saideira.backend.dto.DesafioResponse;
 import com.saideira.backend.dto.RankingItemResponse;
+import com.saideira.backend.dto.RenomearDesafioRequest;
 import com.saideira.backend.dto.RetrospectivaResponse;
 import com.saideira.backend.security.UsuarioAutenticado;
 import com.saideira.backend.service.ChallengeService;
@@ -57,6 +58,25 @@ public class ChallengeController {
         @AuthenticationPrincipal UsuarioAutenticado logado, @PathVariable Long desafioId
     ) {
         return ResponseEntity.ok(challengeService.detalhe(desafioId, logado.getId()));
+    }
+
+    /** So quem criou o desafio. So o nome muda. */
+    @PatchMapping("/desafios/{desafioId}")
+    public ResponseEntity<DesafioResponse> renomear(
+        @AuthenticationPrincipal UsuarioAutenticado logado,
+        @PathVariable Long desafioId,
+        @Valid @RequestBody RenomearDesafioRequest request
+    ) {
+        return ResponseEntity.ok(challengeService.renomear(desafioId, logado.getId(), request.nome()));
+    }
+
+    /** So quem criou o desafio. Leva junto os check-ins, reacoes e comentarios dele. */
+    @DeleteMapping("/desafios/{desafioId}")
+    public ResponseEntity<Void> apagar(
+        @AuthenticationPrincipal UsuarioAutenticado logado, @PathVariable Long desafioId
+    ) {
+        challengeService.apagar(desafioId, logado.getId());
+        return ResponseEntity.noContent().build();
     }
 
     /**

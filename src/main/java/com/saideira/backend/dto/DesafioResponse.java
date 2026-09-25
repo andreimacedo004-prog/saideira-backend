@@ -11,7 +11,9 @@ public record DesafioResponse(
     String nome,
     LocalDate dataInicio,
     LocalDate dataFim,
-    Status status
+    Status status,
+    // Para a tela saber se mostra "Editar desafio" (so quem criou pode)
+    Long criadoPorId
 ) {
     public enum Status {
         EM_BREVE, ATIVO, ENCERRADO
@@ -28,7 +30,8 @@ public record DesafioResponse(
         }
         return new DesafioResponse(
             c.getId(), c.getGrupo().getId(), c.getGrupo().getNome(),
-            c.getNome(), c.getDataInicio(), c.getDataFim(), status
+            c.getNome(), c.getDataInicio(), c.getDataFim(), status,
+            c.getCriadoPor().getId()
         );
     }
 }

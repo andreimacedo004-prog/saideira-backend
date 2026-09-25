@@ -90,7 +90,9 @@ Tudo exige `Authorization: Bearer <token>`, exceto `/api/auth/**`, `/api/health`
 | POST | `/api/grupos/{id}/desafios` | Cria desafio (`nome`, `dataInicio`, `dataFim`) |
 | GET | `/api/grupos/{id}/desafios` | Desafios do grupo |
 | GET | `/api/desafios` | Desafios de todos os meus grupos, ativos primeiro (tela inicial) |
-| GET | `/api/desafios/{id}` | Detalhe, com status `EM_BREVE` / `ATIVO` / `ENCERRADO` |
+| GET | `/api/desafios/{id}` | Detalhe, com status `EM_BREVE` / `ATIVO` / `ENCERRADO` e `criadoPorId` |
+| PATCH | `/api/desafios/{id}` | Muda o nome (`nome`). Só quem criou; as datas não mudam |
+| DELETE | `/api/desafios/{id}` | Apaga o desafio. Só quem criou; leva junto check-ins, reações e comentários (cascade no banco) |
 | GET | `/api/desafios/{id}/ranking` | Ranking com o detalhe dos pontos |
 | GET | `/api/desafios/{id}/retrospectiva` | Meus litros e cervejas + total da galera (para o Wrapped) |
 | POST | `/api/desafios/{id}/checkins` | Faz check-in |
