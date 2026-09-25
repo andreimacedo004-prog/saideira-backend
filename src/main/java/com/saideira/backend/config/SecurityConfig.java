@@ -62,7 +62,8 @@ public class SecurityConfig {
             .exceptionHandling(ex -> ex.authenticationEntryPoint((request, response, authException) -> {
                 response.setStatus(401);
                 response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                response.getWriter().write("{\"erro\":\"Token ausente ou invalido\"}");
+                response.setCharacterEncoding("UTF-8");
+                response.getWriter().write("{\"erro\":\"Token ausente ou inválido\"}");
             }))
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

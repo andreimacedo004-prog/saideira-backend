@@ -153,7 +153,7 @@ class CheckInServiceTest {
     void recusaFuturo() {
         assertThatThrownBy(() -> service.registrar(1L, 100L, pedido(AGORA.plusMinutes(30), null, null)))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("ainda nao aconteceu");
+            .hasMessageContaining("ainda não aconteceu");
     }
 
     @Test
@@ -174,7 +174,7 @@ class CheckInServiceTest {
 
         assertThatThrownBy(() -> service.registrar(1L, 100L, pedido(null, null, null)))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("ainda nao comecou");
+            .hasMessageContaining("ainda não começou");
 
         desafio.setDataInicio(LocalDate.of(2026, 11, 1));
         desafio.setDataFim(LocalDate.of(2026, 11, 6)); // acabou ontem

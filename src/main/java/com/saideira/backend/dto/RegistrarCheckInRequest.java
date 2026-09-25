@@ -26,7 +26,7 @@ public record RegistrarCheckInRequest(
     @Size(max = 500) String legenda,
     LocalDateTime feitoEm,
     @Size(max = 30) List<Long> amigosIds,
-    @Size(max = RegistrarCheckInRequest.MAX_CERVEJAS, message = "No maximo 5 cervejas por check-in")
+    @Size(max = RegistrarCheckInRequest.MAX_CERVEJAS, message = "No máximo 5 cervejas por check-in")
     List<Long> cervejaIds
 ) {
     public static final int MAX_CERVEJAS = 5;

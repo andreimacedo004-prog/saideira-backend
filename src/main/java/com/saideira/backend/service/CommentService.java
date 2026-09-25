@@ -50,13 +50,13 @@ public class CommentService {
     @Transactional
     public void remover(Long comentarioId, Long usuarioId) {
         Comment comentario = commentRepository.findById(comentarioId)
-            .orElseThrow(() -> new RecursoNaoEncontradoException("Comentario nao encontrado"));
+            .orElseThrow(() -> new RecursoNaoEncontradoException("Comentário não encontrado"));
 
         boolean autorDoComentario = comentario.getAutor().getId().equals(usuarioId);
         boolean donoDoCheckIn = comentario.getCheckIn().getAutor().getId().equals(usuarioId);
 
         if (!autorDoComentario && !donoDoCheckIn) {
-            throw new AcessoNegadoException("So quem comentou ou o dono do check-in pode apagar");
+            throw new AcessoNegadoException("Só quem comentou ou o dono do check-in pode apagar");
         }
         commentRepository.delete(comentario);
     }

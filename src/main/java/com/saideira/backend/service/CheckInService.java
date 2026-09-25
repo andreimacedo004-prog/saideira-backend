@@ -129,10 +129,10 @@ public class CheckInService {
     @Transactional
     public void remover(Long checkInId, Long usuarioId) {
         CheckIn checkIn = checkInRepository.findById(checkInId)
-            .orElseThrow(() -> new RecursoNaoEncontradoException("Check-in nao encontrado"));
+            .orElseThrow(() -> new RecursoNaoEncontradoException("Check-in não encontrado"));
 
         if (!checkIn.getAutor().getId().equals(usuarioId)) {
-            throw new AcessoNegadoException("So quem fez o check-in pode apagar");
+            throw new AcessoNegadoException("Só quem fez o check-in pode apagar");
         }
         checkInRepository.delete(checkIn);
     }
@@ -144,10 +144,10 @@ public class CheckInService {
     @Transactional(readOnly = true)
     public CheckIn buscarVisivel(Long checkInId, Long usuarioId) {
         CheckIn checkIn = checkInRepository.findById(checkInId)
-            .orElseThrow(() -> new RecursoNaoEncontradoException("Check-in nao encontrado"));
+            .orElseThrow(() -> new RecursoNaoEncontradoException("Check-in não encontrado"));
 
         if (!checkIn.getDesafio().getGrupo().temMembro(usuarioId)) {
-            throw new AcessoNegadoException("Voce nao faz parte do grupo deste check-in");
+            throw new AcessoNegadoException("Você não faz parte do grupo deste check-in");
         }
         return checkIn;
     }
@@ -158,16 +158,16 @@ public class CheckInService {
 
     private void validarHorario(Challenge desafio, LocalDateTime feitoEm, LocalDateTime agora) {
         if (feitoEm.isAfter(agora.plus(TOLERANCIA_FUTURO))) {
-            throw new IllegalArgumentException("Nao da para fazer check-in de um role que ainda nao aconteceu");
+            throw new IllegalArgumentException("Não dá para fazer check-in de um rolê que ainda não aconteceu");
         }
         if (feitoEm.isBefore(agora.minus(maxRetroativo))) {
             throw new IllegalArgumentException(
-                "Da para registrar roles de ate " + maxRetroativo.toHours() + "h atras"
+                "Dá para registrar rolês de até " + maxRetroativo.toHours() + "h atrás"
             );
         }
         if (feitoEm.toLocalDate().isBefore(desafio.getDataInicio())) {
             throw new IllegalArgumentException(
-                "O desafio ainda nao comecou — comeca em " + desafio.getDataInicio().format(DATA)
+                "O desafio ainda não começou — começa em " + desafio.getDataInicio().format(DATA)
             );
         }
         if (feitoEm.toLocalDate().isAfter(desafio.getDataFim())) {
@@ -182,7 +182,7 @@ public class CheckInService {
             autorId, desafioId, feitoEm.minus(intervaloMinimo), feitoEm.plus(intervaloMinimo)
         ).ifPresent(conflito -> {
             throw new IllegalArgumentException(
-                "Voce ja fez check-in as " + conflito.getFeitoEm().format(HORA)
+                "Você já fez check-in às " + conflito.getFeitoEm().format(HORA)
                 + ". Precisa de pelo menos " + descrever(intervaloMinimo) + " entre um check-in e outro."
             );
         });
@@ -198,12 +198,12 @@ public class CheckInService {
                 continue;
             }
             if (amigoId.equals(autorId)) {
-                throw new IllegalArgumentException("Nao precisa se marcar no proprio check-in");
+                throw new IllegalArgumentException("Não precisa se marcar no próprio check-in");
             }
             User amigo = grupo.getMembros().stream()
                 .filter(m -> m.getId().equals(amigoId))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("So da para marcar quem esta no grupo"));
+                .orElseThrow(() -> new IllegalArgumentException("Só dá para marcar quem está no grupo"));
             amigos.add(amigo);
         }
         return amigos;
@@ -217,7 +217,7 @@ public class CheckInService {
         ids.remove(null);
         List<Beer> encontradas = beerRepository.findAllById(ids);
         if (encontradas.size() != ids.size()) {
-            throw new RecursoNaoEncontradoException("Cerveja nao encontrada no catalogo");
+            throw new RecursoNaoEncontradoException("Cerveja não encontrada no catálogo");
         }
         return new LinkedHashSet<>(encontradas);
     }

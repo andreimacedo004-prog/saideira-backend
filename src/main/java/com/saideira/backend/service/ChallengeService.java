@@ -52,13 +52,13 @@ public class ChallengeService {
         LocalDate hoje = LocalDate.now(clock);
 
         if (fim.isBefore(inicio)) {
-            throw new IllegalArgumentException("A data de fim precisa ser igual ou depois da data de inicio");
+            throw new IllegalArgumentException("A data de fim precisa ser igual ou depois da data de início");
         }
         if (fim.isBefore(hoje)) {
-            throw new IllegalArgumentException("Esse desafio ja teria acabado — escolha uma data de fim a partir de hoje");
+            throw new IllegalArgumentException("Esse desafio já teria acabado — escolha uma data de fim a partir de hoje");
         }
         if (ChronoUnit.DAYS.between(inicio, fim) >= DURACAO_MAXIMA_DIAS) {
-            throw new IllegalArgumentException("Um desafio pode durar no maximo 1 ano");
+            throw new IllegalArgumentException("Um desafio pode durar no máximo 1 ano");
         }
 
         Challenge desafio = new Challenge();
@@ -113,10 +113,10 @@ public class ChallengeService {
     @Transactional(readOnly = true)
     public Challenge buscarDoMembro(Long desafioId, Long usuarioId) {
         Challenge desafio = challengeRepository.findById(desafioId)
-            .orElseThrow(() -> new RecursoNaoEncontradoException("Desafio nao encontrado"));
+            .orElseThrow(() -> new RecursoNaoEncontradoException("Desafio não encontrado"));
 
         if (!desafio.getGrupo().temMembro(usuarioId)) {
-            throw new AcessoNegadoException("Voce nao faz parte do grupo deste desafio");
+            throw new AcessoNegadoException("Você não faz parte do grupo deste desafio");
         }
         return desafio;
     }

@@ -46,7 +46,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Map<String, String>> handleCredenciais(BadCredentialsException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-            .body(Map.of("erro", "E-mail ou senha invalidos"));
+            .body(Map.of("erro", "E-mail ou senha inválidos"));
     }
 
     // Validacao dos DTOs (@NotBlank, @Size, @Pattern...)
@@ -55,7 +55,7 @@ public class GlobalExceptionHandler {
         Map<String, String> erros = ex.getBindingResult().getFieldErrors().stream()
             .collect(Collectors.toMap(
                 e -> e.getField(),
-                e -> e.getDefaultMessage() == null ? "valor invalido" : e.getDefaultMessage(),
+                e -> e.getDefaultMessage() == null ? "valor inválido" : e.getDefaultMessage(),
                 (msg1, msg2) -> msg1
             ));
         return ResponseEntity.badRequest().body(erros);
@@ -64,19 +64,19 @@ public class GlobalExceptionHandler {
     // JSON malformado ou enum desconhecido no corpo (ex: "tipo": "BALADA")
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, String>> handleCorpoInvalido(HttpMessageNotReadableException ex) {
-        return ResponseEntity.badRequest().body(Map.of("erro", "Corpo da requisicao invalido"));
+        return ResponseEntity.badRequest().body(Map.of("erro", "Corpo da requisição inválido"));
     }
 
     // Parametro de URL com tipo errado (ex: /reacoes/XPTO ou /checkins/abc)
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, String>> handleParametroInvalido(MethodArgumentTypeMismatchException ex) {
-        return ResponseEntity.badRequest().body(Map.of("erro", "Valor invalido para '" + ex.getName() + "'"));
+        return ResponseEntity.badRequest().body(Map.of("erro", "Valor inválido para '" + ex.getName() + "'"));
     }
 
     // Duas requisicoes iguais ao mesmo tempo batendo numa constraint unica do banco
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, String>> handleConflito(DataIntegrityViolationException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(Map.of("erro", "Esse registro ja existe ou entra em conflito com outro"));
+            .body(Map.of("erro", "Esse registro já existe ou entra em conflito com outro"));
     }
 }

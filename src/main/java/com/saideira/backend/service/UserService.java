@@ -27,7 +27,7 @@ public class UserService {
             throw new IllegalArgumentException("A senha precisa ter pelo menos 8 caracteres");
         }
         if (userRepository.existsByEmail(emailNormalizado)) {
-            throw new IllegalArgumentException("Ja existe uma conta com este e-mail");
+            throw new IllegalArgumentException("Já existe uma conta com este e-mail");
         }
         User novo = new User();
         novo.setEmail(emailNormalizado);
@@ -39,7 +39,7 @@ public class UserService {
     @Transactional(readOnly = true)
     public User buscarPorId(Long id) {
         return userRepository.findById(id)
-            .orElseThrow(() -> new RecursoNaoEncontradoException("Usuario nao encontrado"));
+            .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
     }
 
     @Transactional(readOnly = true)

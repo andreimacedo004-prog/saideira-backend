@@ -52,7 +52,7 @@ public class FriendGroupService {
     @Transactional
     public FriendGroupResponse entrarPorCodigo(String codigoConvite, Long usuarioId) {
         FriendGroup grupo = friendGroupRepository.findByCodigoConvite(codigoConvite.trim().toLowerCase())
-            .orElseThrow(() -> new RecursoNaoEncontradoException("Convite invalido ou expirado"));
+            .orElseThrow(() -> new RecursoNaoEncontradoException("Convite inválido ou expirado"));
 
         if (!grupo.temMembro(usuarioId)) {
             grupo.getMembros().add(userService.buscarPorId(usuarioId));
@@ -85,10 +85,10 @@ public class FriendGroupService {
     @Transactional(readOnly = true)
     public FriendGroup buscarGrupoDoMembro(Long grupoId, Long usuarioId) {
         FriendGroup grupo = friendGroupRepository.findById(grupoId)
-            .orElseThrow(() -> new RecursoNaoEncontradoException("Grupo nao encontrado"));
+            .orElseThrow(() -> new RecursoNaoEncontradoException("Grupo não encontrado"));
 
         if (!grupo.temMembro(usuarioId)) {
-            throw new AcessoNegadoException("Voce nao faz parte deste grupo");
+            throw new AcessoNegadoException("Você não faz parte deste grupo");
         }
         return grupo;
     }
@@ -104,6 +104,6 @@ public class FriendGroupService {
                 return codigo;
             }
         }
-        throw new IllegalStateException("Nao foi possivel gerar um codigo de convite unico");
+        throw new IllegalStateException("Não foi possível gerar um código de convite único");
     }
 }

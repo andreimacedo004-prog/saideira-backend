@@ -17,5 +17,5 @@ public record CadastroRequest(
     @NotBlank @Size(max = 60) String nome,
 
     // App de role com cerveja: a pessoa confirma que tem 18+ no cadastro
-    @NotNull @AssertTrue(message = "O Saideira e so para maiores de 18 anos") Boolean maiorDeIdade
+    @NotNull @AssertTrue(message = "O Saideira é só para maiores de 18 anos") Boolean maiorDeIdade
 ) {}
