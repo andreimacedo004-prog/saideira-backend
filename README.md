@@ -98,6 +98,8 @@ Tudo exige `Authorization: Bearer <token>`, exceto `/api/auth/**`, `/api/health`
 | POST | `/api/desafios/{id}/checkins` | Faz check-in |
 | GET | `/api/desafios/{id}/checkins` | Feed, já com pontos, reações e nº de comentários |
 | GET | `/api/checkins/{id}` | Um check-in |
+| GET | `/api/checkins/{id}/edicao` | Dados para a tela de edição, com formato e quantidade (só o autor) |
+| PUT | `/api/checkins/{id}` | Edita tudo menos o horário (só o autor, enquanto o desafio não acabou). Devolve o card com os pontos recalculados |
 | DELETE | `/api/checkins/{id}` | Apaga (só o autor) |
 | PUT | `/api/checkins/{id}/reacoes/{tipo}` | Reage: `BRINDE`, `FOGO`, `RISADA`, `LENDA` |
 | DELETE | `/api/checkins/{id}/reacoes/{tipo}` | Desfaz a reação |

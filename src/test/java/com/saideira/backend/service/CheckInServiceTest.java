@@ -1,6 +1,8 @@
 package com.saideira.backend.service;
 
+import com.saideira.backend.dto.CheckInParaEditarResponse;
 import com.saideira.backend.dto.CheckInResponse;
+import com.saideira.backend.dto.EditarCheckInRequest;
 import com.saideira.backend.dto.ItemCervejaRequest;
 import com.saideira.backend.dto.RegistrarCheckInRequest;
 import com.saideira.backend.exception.AcessoNegadoException;
@@ -38,6 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -269,6 +272,141 @@ class CheckInServiceTest {
 
         assertThatThrownBy(() -> service.buscarVisivel(500L, forasteiro.getId()))
             .isInstanceOf(AcessoNegadoException.class);
+    }
+
+    // ------------------------------------------------------------------
+    // Editar
+    // ------------------------------------------------------------------
+
+    /** Check-in da Ana ja gravado: Bar do Ze, sem cerveja nem amigo (10 + 5 de lugar novo). */
+    private CheckIn checkInDaAnaGravado() {
+        service.registrar(1L, 100L, pedido(AGORA.minusHours(3), null, null));
+        salvo.setDesafio(desafio);
+        when(checkInRepository.findById(500L)).thenReturn(Optional.of(salvo));
+        return salvo;
+    }
+
+    private Beer heineken() {
+        Beer b = new Beer();
+        b.setId(7L);
+        b.setNome("Heineken");
+        return b;
+    }
+
+    @Test
+    @DisplayName("Autor edita tudo menos o horario, e os pontos saem recalculados")
+    void autorEdita() {
+        CheckIn checkIn = checkInDaAnaGravado();
+        when(beerRepository.findAllById(any())).thenReturn(List.of(heineken()));
+
+        CheckInResponse resposta = service.editar(500L, 1L, new EditarCheckInRequest(
+            CheckIn.TipoRole.FESTA, "  Casa da Bia ", "https://res.cloudinary.com/x/foto.jpg", "   ",
+            List.of(2L), List.of(new ItemCervejaRequest(7L, FormatoCerveja.GARRAFA, 2))
+        ));
+
+        assertThat(checkIn.getTipo()).isEqualTo(CheckIn.TipoRole.FESTA);
+        assertThat(checkIn.getLocal()).isEqualTo("Casa da Bia");
+        assertThat(checkIn.getLocalNormalizado()).isEqualTo("casa da bia");
+        assertThat(checkIn.getFotoUrl()).isEqualTo("https://res.cloudinary.com/x/foto.jpg");
+        assertThat(checkIn.getLegenda()).isNull();
+        assertThat(checkIn.getAmigosMarcados()).containsExactly(bia);
+        assertThat(checkIn.getCervejas()).singleElement().satisfies(item -> {
+            assertThat(item.getFormato()).isEqualTo(FormatoCerveja.GARRAFA);
+            assertThat(item.getQuantidade()).isEqualTo(2);
+        });
+        assertThat(resposta.feitoEm()).isEqualTo(AGORA.minusHours(3));
+        // 10 + cerveja nova (5) + 1 amigo (3) + lugar novo (5)
+        assertThat(resposta.pontos().total()).isEqualTo(23);
+        // So o registro consultou o intervalo: editar nao mexe no horario, entao nao reconfere
+        verify(checkInRepository, times(1)).findConflitante(anyLong(), anyLong(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Editar pode tirar foto, amigos e cervejas")
+    void editarTiraTudo() {
+        CheckIn checkIn = checkInDaAnaGravado();
+        checkIn.setFotoUrl("https://res.cloudinary.com/x/antiga.jpg");
+        checkIn.getAmigosMarcados().add(bia);
+
+        service.editar(500L, 1L, new EditarCheckInRequest(
+            CheckIn.TipoRole.BAR, "Bar do Zé", "", null, List.of(), null
+        ));
+
+        assertThat(checkIn.getFotoUrl()).isNull();
+        assertThat(checkIn.getAmigosMarcados()).isEmpty();
+        assertThat(checkIn.getCervejas()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("So o autor edita (e so ele recebe os dados de edicao)")
+    void soAutorEdita() {
+        CheckIn checkIn = checkInDaAnaGravado();
+        EditarCheckInRequest pedido = new EditarCheckInRequest(CheckIn.TipoRole.SHOW, "Outro lugar", null, null, null, null);
+
+        assertThatThrownBy(() -> service.editar(500L, 2L, pedido))
+            .isInstanceOf(AcessoNegadoException.class)
+            .hasMessageContaining("Só quem fez o check-in pode editar");
+        assertThatThrownBy(() -> service.paraEditar(500L, 2L))
+            .isInstanceOf(AcessoNegadoException.class);
+
+        assertThat(checkIn.getLocal()).isEqualTo("Bar do Zé");
+        assertThat(checkIn.getTipo()).isEqualTo(CheckIn.TipoRole.BAR);
+    }
+
+    @Test
+    @DisplayName("Depois que o desafio acaba, ninguem edita")
+    void desafioEncerradoNaoEdita() {
+        CheckIn checkIn = checkInDaAnaGravado();
+        desafio.setDataFim(LocalDate.of(2026, 11, 6)); // acabou ontem
+
+        assertThatThrownBy(() -> service.editar(500L, 1L,
+            new EditarCheckInRequest(CheckIn.TipoRole.BAR, "Outro", null, null, null, null)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("não mudam mais");
+        assertThat(checkIn.getLocal()).isEqualTo("Bar do Zé");
+    }
+
+    @Test
+    @DisplayName("Edicao invalida nao muda nada no check-in")
+    void edicaoInvalidaNaoMexe() {
+        CheckIn checkIn = checkInDaAnaGravado();
+
+        assertThatThrownBy(() -> service.editar(500L, 1L, new EditarCheckInRequest(
+            CheckIn.TipoRole.FESTA, "Outro lugar", null, null, List.of(forasteiro.getId()), null)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("grupo");
+        assertThatThrownBy(() -> service.editar(500L, 1L, new EditarCheckInRequest(
+            CheckIn.TipoRole.FESTA, "Outro lugar", null, null, List.of(1L), null)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("se marcar");
+        assertThatThrownBy(() -> service.editar(500L, 1L, new EditarCheckInRequest(
+            CheckIn.TipoRole.FESTA, "Outro lugar", null, null, null, List.of(
+                new ItemCervejaRequest(7L, FormatoCerveja.LATA, 1), new ItemCervejaRequest(7L, FormatoCerveja.LATA, 2)))))
+            .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(checkIn.getLocal()).isEqualTo("Bar do Zé");
+        assertThat(checkIn.getTipo()).isEqualTo(CheckIn.TipoRole.BAR);
+    }
+
+    @Test
+    @DisplayName("Dados de edicao trazem formato, quantidade e ids dos amigos")
+    void dadosParaEditar() {
+        when(beerRepository.findAllById(any())).thenReturn(List.of(heineken()));
+        service.registrar(1L, 100L, pedidoComCervejas(null, List.of(2L),
+            List.of(new ItemCervejaRequest(7L, FormatoCerveja.LATAO, 4))));
+        salvo.setDesafio(desafio);
+        when(checkInRepository.findById(500L)).thenReturn(Optional.of(salvo));
+
+        CheckInParaEditarResponse dados = service.paraEditar(500L, 1L);
+
+        assertThat(dados.amigosIds()).containsExactly(2L);
+        assertThat(dados.cervejas()).singleElement().satisfies(item -> {
+            assertThat(item.cerveja().nome()).isEqualTo("Heineken");
+            assertThat(item.formato()).isEqualTo(FormatoCerveja.LATAO);
+            assertThat(item.quantidade()).isEqualTo(4);
+        });
+        assertThat(dados.local()).isEqualTo("Bar do Zé");
+        assertThat(dados.legenda()).isEqualTo("Saideira!");
     }
 
     @Test

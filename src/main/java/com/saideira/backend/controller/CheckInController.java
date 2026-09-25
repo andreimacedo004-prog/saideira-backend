@@ -1,6 +1,8 @@
 package com.saideira.backend.controller;
 
+import com.saideira.backend.dto.CheckInParaEditarResponse;
 import com.saideira.backend.dto.CheckInResponse;
+import com.saideira.backend.dto.EditarCheckInRequest;
 import com.saideira.backend.dto.RegistrarCheckInRequest;
 import com.saideira.backend.security.UsuarioAutenticado;
 import com.saideira.backend.service.CheckInService;
@@ -45,6 +47,24 @@ public class CheckInController {
         @AuthenticationPrincipal UsuarioAutenticado logado, @PathVariable Long checkInId
     ) {
         return ResponseEntity.ok(checkInService.detalhe(checkInId, logado.getId()));
+    }
+
+    /** So o autor: o check-in como ele preencheu, com formato e quantidade das cervejas. */
+    @GetMapping("/checkins/{checkInId}/edicao")
+    public ResponseEntity<CheckInParaEditarResponse> paraEditar(
+        @AuthenticationPrincipal UsuarioAutenticado logado, @PathVariable Long checkInId
+    ) {
+        return ResponseEntity.ok(checkInService.paraEditar(checkInId, logado.getId()));
+    }
+
+    /** So o autor, enquanto o desafio nao acabou. O horario nao muda. Devolve o card com os pontos recalculados. */
+    @PutMapping("/checkins/{checkInId}")
+    public ResponseEntity<CheckInResponse> editar(
+        @AuthenticationPrincipal UsuarioAutenticado logado,
+        @PathVariable Long checkInId,
+        @Valid @RequestBody EditarCheckInRequest request
+    ) {
+        return ResponseEntity.ok(checkInService.editar(checkInId, logado.getId(), request));
     }
 
     @DeleteMapping("/checkins/{checkInId}")

@@ -1,6 +1,8 @@
 package com.saideira.backend.service;
 
+import com.saideira.backend.dto.CheckInParaEditarResponse;
 import com.saideira.backend.dto.CheckInResponse;
+import com.saideira.backend.dto.EditarCheckInRequest;
 import com.saideira.backend.dto.ItemCervejaRequest;
 import com.saideira.backend.dto.ReacaoResumo;
 import com.saideira.backend.dto.RegistrarCheckInRequest;
@@ -23,8 +25,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -34,7 +38,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Check-ins: registrar, apagar e montar o feed.
+ * Check-ins: registrar, editar, apagar e montar o feed.
  *
  * Regras de registro (todas testadas em CheckInServiceTest):
  *  - so membro do grupo faz check-in no desafio;
@@ -90,7 +94,9 @@ public class CheckInService {
     public CheckInResponse registrar(Long autorId, Long desafioId, RegistrarCheckInRequest req) {
         Challenge desafio = challengeService.buscarDoMembro(desafioId, autorId);
         LocalDateTime agora = LocalDateTime.now(clock);
-        LocalDateTime feitoEm = req.feitoEm() != null ? req.feitoEm() : agora;
+        // Sem fracao de segundo: o banco arredonda nanossegundos, e a resposta
+        // do registro ficaria diferente do que volta depois no feed
+        LocalDateTime feitoEm = (req.feitoEm() != null ? req.feitoEm() : agora).truncatedTo(ChronoUnit.SECONDS);
 
         validarHorario(desafio, feitoEm, agora);
         validarIntervalo(autorId, desafio.getId(), feitoEm);
@@ -128,6 +134,41 @@ public class CheckInService {
         return montar(doDesafio, List.of(checkIn), usuarioId).get(0);
     }
 
+    /** O check-in como o autor preencheu (com formato e quantidade), para a tela de edicao. */
+    @Transactional(readOnly = true)
+    public CheckInParaEditarResponse paraEditar(Long checkInId, Long usuarioId) {
+        return CheckInParaEditarResponse.de(buscarParaEditar(checkInId, usuarioId));
+    }
+
+    /**
+     * So o autor edita, e so enquanto o desafio nao acabou (o ranking final
+     * nao muda depois). O horario fica como estava. Tudo o mais passa pelas
+     * mesmas regras do registro, e os pontos saem recalculados.
+     */
+    @Transactional
+    public CheckInResponse editar(Long checkInId, Long usuarioId, EditarCheckInRequest req) {
+        CheckIn checkIn = buscarParaEditar(checkInId, usuarioId);
+        Challenge desafio = checkIn.getDesafio();
+
+        // Resolve antes de mexer: se algo for invalido, nada muda
+        Set<User> amigos = resolverAmigos(req.amigosIds(), usuarioId, desafio.getGrupo());
+        List<CervejaDoRole> cervejas = resolverCervejas(req.cervejas());
+
+        checkIn.setTipo(req.tipo());
+        checkIn.setLocal(req.local().trim());
+        checkIn.setLocalNormalizado(Normalizador.normalizar(req.local()));
+        checkIn.setFotoUrl(vazioViraNulo(req.fotoUrl()));
+        checkIn.setLegenda(vazioViraNulo(req.legenda()));
+        // Troca o conteudo das colecoes (e nao a colecao) para o Hibernate acompanhar
+        checkIn.getAmigosMarcados().clear();
+        checkIn.getAmigosMarcados().addAll(amigos);
+        checkIn.getCervejas().clear();
+        checkIn.getCervejas().addAll(cervejas);
+
+        List<CheckIn> doDesafio = checkInRepository.findDoDesafio(desafio.getId());
+        return montar(doDesafio, List.of(checkIn), usuarioId).get(0);
+    }
+
     /** So o autor apaga. Reacoes e comentarios vao junto (ON DELETE CASCADE). */
     @Transactional
     public void remover(Long checkInId, Long usuarioId) {
@@ -151,6 +192,26 @@ public class CheckInService {
 
         if (!checkIn.getDesafio().getGrupo().temMembro(usuarioId)) {
             throw new AcessoNegadoException("Você não faz parte do grupo deste check-in");
+        }
+        return checkIn;
+    }
+
+    /** Autor, ainda no grupo, com o desafio em andamento. */
+    private CheckIn buscarParaEditar(Long checkInId, Long usuarioId) {
+        CheckIn checkIn = checkInRepository.findById(checkInId)
+            .orElseThrow(() -> new RecursoNaoEncontradoException("Check-in não encontrado"));
+
+        if (!checkIn.getAutor().getId().equals(usuarioId)) {
+            throw new AcessoNegadoException("Só quem fez o check-in pode editar");
+        }
+        Challenge desafio = checkIn.getDesafio();
+        if (!desafio.getGrupo().temMembro(usuarioId)) {
+            throw new AcessoNegadoException("Você não faz parte do grupo deste check-in");
+        }
+        if (LocalDate.now(clock).isAfter(desafio.getDataFim())) {
+            throw new IllegalArgumentException(
+                "O desafio acabou em " + desafio.getDataFim().format(DATA) + " — os check-ins dele não mudam mais"
+            );
         }
         return checkIn;
     }
