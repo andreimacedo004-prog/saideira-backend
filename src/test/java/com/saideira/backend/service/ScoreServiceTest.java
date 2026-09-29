@@ -179,4 +179,37 @@ class ScoreServiceTest {
         assertThat(ranking).extracting(ScoreService.PosicaoRanking::posicao).containsExactly(1, 1);
         assertThat(ranking).extracting(ScoreService.PosicaoRanking::pontos).containsOnly(0);
     }
+
+    @Test
+    @DisplayName("Ajuste do admin soma no total, reordena o ranking e vem com o motivo")
+    void ajustesDoAdmin() {
+        User ana = usuario(1, "Ana");
+        User bia = usuario(2, "Bia");
+        User caio = usuario(3, "Caio");
+        // Ana 15 (check-in + lugar novo), Bia 15
+        CheckIn daAna = checkIn(ana, "Bar do Zé", SEXTA, List.of(), List.of());
+        CheckIn daBia = checkIn(bia, "Casa da Bia", SEXTA.plusHours(1), List.of(), List.of());
+
+        com.saideira.backend.model.AjustePontos menosDez = new com.saideira.backend.model.AjustePontos();
+        menosDez.setUsuario(ana);
+        menosDez.setPontos(-10);
+        menosDez.setMotivo("check-in repetido");
+        // Caio saiu do grupo mas ganhou bonus: aparece mesmo assim
+        com.saideira.backend.model.AjustePontos bonus = new com.saideira.backend.model.AjustePontos();
+        bonus.setUsuario(caio);
+        bonus.setPontos(7);
+        bonus.setMotivo("organizou o churrasco");
+
+        List<ScoreService.PosicaoRanking> ranking = scoreService.ranking(
+            List.of(ana, bia), List.of(daAna, daBia), List.of(menosDez, bonus));
+
+        assertThat(ranking).extracting(p -> p.usuario().getNome()).containsExactly("Bia", "Caio", "Ana");
+        assertThat(ranking).extracting(ScoreService.PosicaoRanking::pontos).containsExactly(15, 7, 5);
+        ScoreService.PosicaoRanking linhaAna = ranking.get(2);
+        assertThat(linhaAna.ajuste()).isEqualTo(-10);
+        assertThat(linhaAna.checkIns()).isEqualTo(1);
+        assertThat(linhaAna.ajustes()).extracting(a -> a.getMotivo()).containsExactly("check-in repetido");
+        assertThat(ranking.get(0).ajuste()).isZero();
+        assertThat(ranking.get(0).ajustes()).isEmpty();
+    }
 }

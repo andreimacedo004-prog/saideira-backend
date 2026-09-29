@@ -11,9 +11,11 @@ public record UsuarioResponse(
     String email,
     String nome,
     String fotoUrl,
-    String bio
+    String bio,
+    // So para o app mostrar o menu "Admin"; quem decide o acesso e o servidor
+    boolean admin
 ) {
-    public static UsuarioResponse de(User u) {
-        return new UsuarioResponse(u.getId(), u.getEmail(), u.getNome(), u.getFotoUrl(), u.getBio());
+    public static UsuarioResponse de(User u, boolean admin) {
+        return new UsuarioResponse(u.getId(), u.getEmail(), u.getNome(), u.getFotoUrl(), u.getBio(), admin);
     }
 }

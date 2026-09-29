@@ -7,10 +7,7 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-/**
- * Uma cerveja do catalogo. O catalogo e compartilhado por todo mundo e
- * cresce conforme a galera cadastra o que bebeu.
- */
+
 @Entity
 @Table(name = "beers")
 @Getter

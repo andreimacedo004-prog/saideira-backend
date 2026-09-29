@@ -4,9 +4,11 @@ import com.saideira.backend.dto.DesafioResponse;
 import com.saideira.backend.dto.RankingItemResponse;
 import com.saideira.backend.exception.AcessoNegadoException;
 import com.saideira.backend.exception.RecursoNaoEncontradoException;
+import com.saideira.backend.model.AjustePontos;
 import com.saideira.backend.model.Challenge;
 import com.saideira.backend.model.CheckIn;
 import com.saideira.backend.model.FriendGroup;
+import com.saideira.backend.repository.AjustePontosRepository;
 import com.saideira.backend.repository.ChallengeRepository;
 import com.saideira.backend.repository.CheckInRepository;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,7 @@ public class ChallengeService {
 
     private final ChallengeRepository challengeRepository;
     private final CheckInRepository checkInRepository;
+    private final AjustePontosRepository ajustePontosRepository;
     private final FriendGroupService friendGroupService;
     private final UserService userService;
     private final ScoreService scoreService;
@@ -36,6 +39,7 @@ public class ChallengeService {
     public ChallengeService(
         ChallengeRepository challengeRepository,
         CheckInRepository checkInRepository,
+        AjustePontosRepository ajustePontosRepository,
         FriendGroupService friendGroupService,
         UserService userService,
         ScoreService scoreService,
@@ -43,6 +47,7 @@ public class ChallengeService {
     ) {
         this.challengeRepository = challengeRepository;
         this.checkInRepository = checkInRepository;
+        this.ajustePontosRepository = ajustePontosRepository;
         this.friendGroupService = friendGroupService;
         this.userService = userService;
         this.scoreService = scoreService;
@@ -123,8 +128,9 @@ public class ChallengeService {
     public List<RankingItemResponse> ranking(Long desafioId, Long usuarioId) {
         Challenge desafio = buscarDoMembro(desafioId, usuarioId);
         List<CheckIn> checkIns = checkInRepository.findDoDesafio(desafio.getId());
+        List<AjustePontos> ajustes = ajustePontosRepository.findDoDesafio(desafio.getId());
 
-        return scoreService.ranking(desafio.getGrupo().getMembros(), checkIns).stream()
+        return scoreService.ranking(desafio.getGrupo().getMembros(), checkIns, ajustes).stream()
             .map(RankingItemResponse::de)
             .toList();
     }

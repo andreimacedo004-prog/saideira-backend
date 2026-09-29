@@ -2,6 +2,7 @@ package com.saideira.backend.security;
 
 import com.saideira.backend.model.User;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
@@ -16,11 +17,17 @@ public class UsuarioAutenticado implements UserDetails {
     private final Long id;
     private final String email;
     private final String senhaHash;
+    private final boolean admin;
 
     public UsuarioAutenticado(User user) {
+        this(user, false);
+    }
+
+    public UsuarioAutenticado(User user, boolean admin) {
         this.id = user.getId();
         this.email = user.getEmail();
         this.senhaHash = user.getSenhaHash();
+        this.admin = admin;
     }
 
     public Long getId() {
@@ -29,7 +36,11 @@ public class UsuarioAutenticado implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of();
+        return admin ? List.of(new SimpleGrantedAuthority("ROLE_ADMIN")) : List.of();
+    }
+
+    public boolean isAdmin() {
+        return admin;
     }
 
     @Override

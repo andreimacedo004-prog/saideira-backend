@@ -4,6 +4,7 @@ import com.saideira.backend.dto.UsuarioResponse;
 import com.saideira.backend.exception.RecursoNaoEncontradoException;
 import com.saideira.backend.model.User;
 import com.saideira.backend.repository.UserRepository;
+import com.saideira.backend.security.Administradores;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,10 +15,12 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final Administradores administradores;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, Administradores administradores) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.administradores = administradores;
     }
 
     @Transactional
@@ -44,7 +47,8 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UsuarioResponse meuPerfil(Long id) {
-        return UsuarioResponse.de(buscarPorId(id));
+        User usuario = buscarPorId(id);
+        return UsuarioResponse.de(usuario, administradores.eAdmin(usuario.getEmail()));
     }
 
     @Transactional
@@ -53,7 +57,8 @@ public class UserService {
         usuario.setNome(nome.trim());
         usuario.setBio(vazioViraNulo(bio));
         usuario.setFotoUrl(vazioViraNulo(fotoUrl));
-        return UsuarioResponse.de(userRepository.save(usuario));
+        User salvo = userRepository.save(usuario);
+        return UsuarioResponse.de(salvo, administradores.eAdmin(salvo.getEmail()));
     }
 
     private static String vazioViraNulo(String texto) {

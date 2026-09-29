@@ -9,13 +9,7 @@ import org.springframework.context.annotation.Configuration;
 
 import java.io.IOException;
 
-/**
- * Tira espacos das pontas de todo texto que chega no JSON.
- *
- * O teclado do celular costuma colocar um espaco depois do e-mail
- * autocompletado ("ana@gmail.com "), e sem isto o login falharia na
- * validacao de e-mail. De quebra, "  Bar do Ze " ja chega limpo.
- */
+
 @Configuration
 public class JacksonConfig {
 

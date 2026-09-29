@@ -13,12 +13,12 @@ src/main/java/com/saideira/backend/
 ├── service/      → Regras de negócio — o ScoreService é o placar
 ├── controller/   → Endpoints REST
 ├── dto/          → Entrada/saída da API (nunca expõe entidade)
-├── security/     → JWT
+├── security/     → JWT, quem é admin e o limite de tentativas de login
 ├── config/       → Segurança/CORS, relógio no fuso de Brasília, Jackson
 ├── exception/    → Tratamento centralizado de erros
 └── util/         → Normalizador de texto
 
-src/main/resources/db/migration/ → Migrations Flyway (V1 esquema, V2 catálogo de cervejas, V3 formato e quantidade)
+src/main/resources/db/migration/ → Migrations Flyway (V1 esquema, V2 catálogo de cervejas, V3 formato e quantidade, V4 ajustes de pontos do admin)
 src/test/java/                   → Testes unitários
 testar_saideira.ps1              → Passeio completo pela API, em PowerShell
 ```
@@ -35,6 +35,7 @@ testar_saideira.ps1              → Passeio completo pela API, em PowerShell
 - `CheckIn`: o rolê (tipo, local, foto, legenda, horário, amigos marcados, cervejas)
 - `Beer`: catálogo de cervejas compartilhado; já vem com ~27 das mais comuns de bar
 - `Reaction` / `Comment`: interações no feed
+- `AjustePontos`: pontos que o admin soma ou tira de alguém num desafio, sempre com motivo
 
 ## Pontuação
 
@@ -52,6 +53,8 @@ Calculada **na hora**, a partir dos check-ins. Não existe coluna de pontos no b
 - A novidade é por pessoa: a cerveja que a amiga já provou continua nova para você.
 
 Pontua rolê, variedade e galera, nunca quantidade de bebida.
+
+Por cima disso, o admin pode lançar um **ajuste** (−1000 a +1000, com motivo). Ele entra no total e aparece no ranking para todo mundo como "Ajuste do admin: −5 · motivo". Desfazer o ajuste devolve o placar ao que era.
 
 ### Formato e quantidade ("soma escondida")
 
@@ -128,7 +131,33 @@ POST /api/desafios/1/checkins
 
 `tipo`: `BAR`, `FESTA`, `CHURRASCO`, `SHOW`, `VISITA` ou `OUTRO`. `feitoEm` é opcional (sem ele, vale a hora do servidor).
 
-Padrão de erro: `{ "erro": "mensagem" }` com 400 (regra), 401 (token), 403 (não é do grupo), 404 e 409. Validação de campo devolve `{ "campo": "mensagem" }`.
+Padrão de erro: `{ "erro": "mensagem" }` com 400 (regra), 401 (token), 403 (não é do grupo), 404, 409 e 429 (tentativas de login demais). Validação de campo devolve `{ "campo": "mensagem" }`.
+
+Toda recusa (400, 403, 404, 409, 429) vira uma linha `Recusado …` no log com o motivo, sem dados pessoais: validação registra só o nome dos campos.
+
+### Login
+
+Depois de **5 senhas erradas** para o mesmo e-mail (ou 20 vindas do mesmo IP) em 15 minutos, o login responde 429 até a janela passar. Acertar a senha zera a conta daquele e-mail, e a senha temporária gerada pelo admin também libera na hora. O contador fica em memória: reiniciar o serviço zera tudo.
+
+## Área de admin
+
+Quem está em `APP_ADMIN_EMAILS` (lista separada por vírgula) entra no app normalmente, com a própria senha, e ganha o papel `ADMIN`. A lista é conferida a cada requisição, então tirar um e-mail dela corta o acesso sem esperar o token vencer. Para todos os outros, `/api/admin/**` devolve 403.
+
+| Método | Rota | O que faz |
+|---|---|---|
+| GET | `/api/admin/resumo` | Contas, grupos, desafios e check-ins da semana |
+| GET | `/api/admin/usuarios?busca=` | Contas com nº de check-ins, grupos e última atividade (acha as duplicadas) |
+| GET | `/api/admin/usuarios/{id}/exclusao` | Prévia do que some junto se excluir |
+| DELETE | `/api/admin/usuarios/{id}` | Exclui a conta. Grupos que a pessoa criou passam para o membro mais antigo (ou somem, se ela era a única) |
+| POST | `/api/admin/usuarios/{id}/senha-temporaria` | Gera uma senha nova para quem esqueceu e libera o bloqueio de login |
+| GET | `/api/admin/desafios` | Todos os desafios, de todos os grupos |
+| GET | `/api/admin/desafios/{id}` | Ranking, check-ins, ajustes e participantes (admin não precisa ser do grupo) |
+| POST | `/api/admin/desafios/{id}/ajustes` | Soma ou tira pontos (`usuarioId`, `pontos`, `motivo`) |
+| DELETE | `/api/admin/ajustes/{id}` | Desfaz um ajuste |
+| DELETE | `/api/admin/checkins/{id}` | Apaga o check-in de qualquer pessoa |
+| DELETE | `/api/admin/comentarios/{id}` | Apaga qualquer comentário |
+
+Por segurança, o admin não exclui a própria conta nem a de outro admin, e não troca a senha de outro admin por aqui. Cada ação fica no log com os ids envolvidos.
 
 ## Rodando localmente
 
@@ -176,16 +205,20 @@ Mesmo esquema do EloFit: um serviço a partir do repositório e um Postgres no m
 | `JWT_SECRET` | um segredo novo (não reaproveite o de dev nem o do EloFit) |
 | `APP_CORS_ORIGENS` | endereço do PWA, ex.: `https://saideira.vercel.app` |
 | `CONVITE_BASE_URL` | `https://<endereco-do-pwa>/convite/` |
+| `APP_ADMIN_EMAILS` | o e-mail da **sua** conta no Saideira (a conta precisa existir; vários separados por vírgula) |
 
 O Railway injeta `PORT` sozinho.
 
 ## O que ainda falta
 
-- [ ] PWA (React + TypeScript, igual ao elofit-web)
+- [x] PWA (React + TypeScript, igual ao elofit-web)
 - [ ] Saideira Wrapped no fim do desafio (rolê mais épico, bar favorito, quem arrastou mais gente)
 - [ ] Badges
-- [ ] Editar check-in (hoje é apagar e refazer)
-- [ ] Sair do grupo / remover membro; editar e apagar desafio
+- [x] Editar check-in
+- [x] Editar e apagar desafio
+- [ ] Sair do grupo / remover membro
 - [ ] Paginar o feed quando um desafio passar de algumas centenas de check-ins (o ranking continua precisando de todos)
-- [ ] Limite de tentativas no login
+- [x] Limite de tentativas no login
+- [x] Área de admin
+- [ ] Recuperar senha por e-mail (hoje o admin gera uma temporária)
 - [ ] Aceitar foto só do domínio do Cloudinary

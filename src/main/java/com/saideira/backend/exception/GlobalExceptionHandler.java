@@ -1,5 +1,8 @@
 package com.saideira.backend.exception;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,10 +24,23 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // Regra de negocio (ex: "intervalo minimo entre check-ins")
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    // Regra de negocio (ex: "intervalo minimo entre check-ins").
+    // Vai para o log (sem corpo da requisicao nem dados pessoais) para dar
+    // para ver no Railway o que anda travando a galera.
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, String>> handleRegraDeNegocio(IllegalArgumentException ex) {
+    public ResponseEntity<Map<String, String>> handleRegraDeNegocio(IllegalArgumentException ex, HttpServletRequest req) {
+        log.info("Recusado {} {}: {}", req.getMethod(), req.getRequestURI(), ex.getMessage());
         return ResponseEntity.badRequest().body(Map.of("erro", ex.getMessage()));
+    }
+
+    @ExceptionHandler(MuitasTentativasException.class)
+    public ResponseEntity<Map<String, String>> handleMuitasTentativas(MuitasTentativasException ex, HttpServletRequest req) {
+        log.warn("Login bloqueado por excesso de tentativas ({} min)", ex.getMinutos());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+            .header("Retry-After", String.valueOf(ex.getMinutos() * 60))
+            .body(Map.of("erro", ex.getMessage()));
     }
 
     @ExceptionHandler(IllegalStateException.class)
@@ -51,7 +67,10 @@ public class GlobalExceptionHandler {
 
     // Validacao dos DTOs (@NotBlank, @Size, @Pattern...)
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidacao(MethodArgumentNotValidException ex) {
+    public ResponseEntity<Map<String, String>> handleValidacao(MethodArgumentNotValidException ex, HttpServletRequest req) {
+        // So o nome dos campos vai para o log, nunca o valor digitado
+        log.info("Recusado {} {}: campos invalidos {}", req.getMethod(), req.getRequestURI(),
+            ex.getBindingResult().getFieldErrors().stream().map(e -> e.getField()).distinct().toList());
         Map<String, String> erros = ex.getBindingResult().getFieldErrors().stream()
             .collect(Collectors.toMap(
                 e -> e.getField(),

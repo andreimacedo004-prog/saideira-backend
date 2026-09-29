@@ -1,5 +1,6 @@
 package com.saideira.backend.service;
 
+import com.saideira.backend.model.AjustePontos;
 import com.saideira.backend.model.CervejaDoRole;
 import com.saideira.backend.model.CheckIn;
 import com.saideira.backend.model.User;
@@ -31,6 +32,9 @@ import java.util.Set;
  * nem rouba bonus por causa disso.
  *
  * Pontuamos role, variedade e galera — nunca quantidade de bebida.
+ *
+ * Por cima disso entram os ajustes do admin (+ ou −, sempre com motivo),
+ * que somam no total do ranking e aparecem nele.
  */
 @Service
 public class ScoreService {
@@ -43,7 +47,7 @@ public class ScoreService {
     /** Quanto um check-in rendeu e de onde vieram os pontos. */
     public record PontosCheckIn(int total, int cervejasNovas, int amigosMarcados, boolean lugarNovo) {}
 
-    /** Uma linha do ranking. */
+    /** Uma linha do ranking. `pontos` ja inclui `ajuste`. */
     public record PosicaoRanking(
         int posicao,
         User usuario,
@@ -51,7 +55,9 @@ public class ScoreService {
         int checkIns,
         int cervejasNovas,
         int amigosMarcados,
-        int lugaresNovos
+        int lugaresNovos,
+        int ajuste,
+        List<AjustePontos> ajustes
     ) {}
 
     /** Ordem cronologica do role; empate de horario desempata pelo id (ordem de registro). */
@@ -110,14 +116,29 @@ public class ScoreService {
      * para a ordem da lista, desempata por quem fez mais check-ins e depois pelo nome.
      */
     public List<PosicaoRanking> ranking(Collection<User> participantes, Collection<CheckIn> checkInsDoDesafio) {
+        return ranking(participantes, checkInsDoDesafio, List.of());
+    }
+
+    /** Ranking com os ajustes do admin somados ao total de cada pessoa. */
+    public List<PosicaoRanking> ranking(
+        Collection<User> participantes, Collection<CheckIn> checkInsDoDesafio, Collection<AjustePontos> ajustesDoDesafio
+    ) {
         Map<Long, PontosCheckIn> pontosPorCheckIn = pontuarCheckIns(checkInsDoDesafio);
 
         Map<Long, User> usuarios = new LinkedHashMap<>();
         participantes.forEach(u -> usuarios.put(u.getId(), u));
         checkInsDoDesafio.forEach(c -> usuarios.putIfAbsent(c.getAutor().getId(), c.getAutor()));
+        ajustesDoDesafio.forEach(a -> usuarios.putIfAbsent(a.getUsuario().getId(), a.getUsuario()));
 
-        Map<Long, int[]> placar = new HashMap<>(); // [pontos, checkIns, cervejasNovas, amigos, lugaresNovos]
-        usuarios.keySet().forEach(id -> placar.put(id, new int[5]));
+        Map<Long, int[]> placar = new HashMap<>(); // [pontos, checkIns, cervejasNovas, amigos, lugaresNovos, ajuste]
+        usuarios.keySet().forEach(id -> placar.put(id, new int[6]));
+        Map<Long, List<AjustePontos>> ajustesPorUsuario = new HashMap<>();
+        for (AjustePontos ajuste : ajustesDoDesafio) {
+            int[] linha = placar.get(ajuste.getUsuario().getId());
+            linha[0] += ajuste.getPontos();
+            linha[5] += ajuste.getPontos();
+            ajustesPorUsuario.computeIfAbsent(ajuste.getUsuario().getId(), id -> new ArrayList<>()).add(ajuste);
+        }
 
         for (CheckIn checkIn : checkInsDoDesafio) {
             PontosCheckIn p = pontosPorCheckIn.get(checkIn.getId());
@@ -145,7 +166,10 @@ public class ScoreService {
                 posicao = i + 1;
                 pontosAnterior = linha[0];
             }
-            ranking.add(new PosicaoRanking(posicao, u, linha[0], linha[1], linha[2], linha[3], linha[4]));
+            ranking.add(new PosicaoRanking(
+                posicao, u, linha[0], linha[1], linha[2], linha[3], linha[4], linha[5],
+                ajustesPorUsuario.getOrDefault(u.getId(), List.of())
+            ));
         }
         return ranking;
     }

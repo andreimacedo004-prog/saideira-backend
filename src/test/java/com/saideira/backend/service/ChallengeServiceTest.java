@@ -6,6 +6,7 @@ import com.saideira.backend.exception.RecursoNaoEncontradoException;
 import com.saideira.backend.model.Challenge;
 import com.saideira.backend.model.FriendGroup;
 import com.saideira.backend.model.User;
+import com.saideira.backend.repository.AjustePontosRepository;
 import com.saideira.backend.repository.ChallengeRepository;
 import com.saideira.backend.repository.CheckInRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +39,7 @@ class ChallengeServiceTest {
 
     @Mock private ChallengeRepository challengeRepository;
     @Mock private CheckInRepository checkInRepository;
+    @Mock private AjustePontosRepository ajustePontosRepository;
     @Mock private FriendGroupService friendGroupService;
     @Mock private UserService userService;
 
@@ -50,7 +52,8 @@ class ChallengeServiceTest {
     void setUp() {
         Clock relogio = Clock.fixed(LocalDate.of(2026, 11, 7).atStartOfDay(BRASILIA).toInstant(), BRASILIA);
         service = new ChallengeService(
-            challengeRepository, checkInRepository, friendGroupService, userService, new ScoreService(), relogio
+            challengeRepository, checkInRepository, ajustePontosRepository, friendGroupService, userService,
+            new ScoreService(), relogio
         );
 
         ana = usuario(1L, "Ana");
