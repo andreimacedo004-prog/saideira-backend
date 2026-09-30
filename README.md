@@ -88,6 +88,7 @@ Tudo exige `Authorization: Bearer <token>`, exceto `/api/auth/**`, `/api/health`
 | POST | `/api/grupos` | Cria grupo |
 | GET | `/api/grupos` | Meus grupos |
 | GET | `/api/grupos/{id}` | Detalhe (só membros) |
+| PATCH | `/api/grupos/{id}` | Muda o nome (`nome`, até 60 letras). Só quem criou o grupo ou o admin; membros, convite e desafios ficam iguais |
 | GET | `/api/grupos/{id}/convite` | Link para compartilhar |
 | POST | `/api/grupos/entrar` | Entra pelo código do convite |
 | POST | `/api/grupos/{id}/desafios` | Cria desafio (`nome`, `dataInicio`, `dataFim`) |
@@ -156,6 +157,8 @@ Quem está em `APP_ADMIN_EMAILS` (lista separada por vírgula) entra no app norm
 | DELETE | `/api/admin/ajustes/{id}` | Desfaz um ajuste |
 | DELETE | `/api/admin/checkins/{id}` | Apaga o check-in de qualquer pessoa |
 | DELETE | `/api/admin/comentarios/{id}` | Apaga qualquer comentário |
+
+O admin também pode renomear qualquer grupo pela rota normal (`PATCH /api/grupos/{id}`), mesmo sem ser membro.
 
 Por segurança, o admin não exclui a própria conta nem a de outro admin, e não troca a senha de outro admin por aqui. Cada ação fica no log com os ids envolvidos.
 

@@ -111,4 +111,63 @@ class FriendGroupServiceTest {
         assertThatThrownBy(() -> friendGroupService.buscarGrupoDoMembro(10L, 99L))
             .isInstanceOf(AcessoNegadoException.class);
     }
+
+    @Test
+    @DisplayName("Quem criou muda o nome do grupo; membros e convite ficam iguais")
+    void criadorRenomeia() {
+        FriendGroup grupo = grupoCom(usuario(1L), usuario(2L));
+        when(friendGroupRepository.findById(10L)).thenReturn(Optional.of(grupo));
+
+        FriendGroupResponse resposta = friendGroupService.renomear(10L, 1L, false, "  Resenha 2026 ");
+
+        assertThat(grupo.getNome()).isEqualTo("Resenha 2026");
+        assertThat(resposta.nome()).isEqualTo("Resenha 2026");
+        assertThat(resposta.codigoConvite()).isEqualTo("abc12345");
+        assertThat(resposta.membros()).extracting(UsuarioResumo::id).containsExactlyInAnyOrder(1L, 2L);
+    }
+
+    @Test
+    @DisplayName("Outro membro nao muda o nome do grupo")
+    void membroNaoRenomeia() {
+        FriendGroup grupo = grupoCom(usuario(1L), usuario(2L));
+        when(friendGroupRepository.findById(10L)).thenReturn(Optional.of(grupo));
+
+        assertThatThrownBy(() -> friendGroupService.renomear(10L, 2L, false, "Grupo do 2"))
+            .isInstanceOf(AcessoNegadoException.class)
+            .hasMessageContaining("Só quem criou o grupo pode mudar o nome");
+        assertThat(grupo.getNome()).isEqualTo("Resenha");
+    }
+
+    @Test
+    @DisplayName("Quem nao e do grupo recebe o 403 de sempre, sem saber quem criou")
+    void deForaNaoRenomeia() {
+        FriendGroup grupo = grupoCom(usuario(1L));
+        when(friendGroupRepository.findById(10L)).thenReturn(Optional.of(grupo));
+
+        assertThatThrownBy(() -> friendGroupService.renomear(10L, 99L, false, "Invasão"))
+            .isInstanceOf(AcessoNegadoException.class)
+            .hasMessageContaining("não faz parte");
+        assertThat(grupo.getNome()).isEqualTo("Resenha");
+    }
+
+    @Test
+    @DisplayName("Admin renomeia qualquer grupo, mesmo sem ser membro")
+    void adminRenomeia() {
+        FriendGroup grupo = grupoCom(usuario(1L), usuario(2L));
+        when(friendGroupRepository.findById(10L)).thenReturn(Optional.of(grupo));
+
+        friendGroupService.renomear(10L, 99L, true, "Nome certo");
+
+        assertThat(grupo.getNome()).isEqualTo("Nome certo");
+        assertThat(grupo.getMembros()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Renomear grupo que nao existe da 404")
+    void renomearInexistente() {
+        when(friendGroupRepository.findById(404L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> friendGroupService.renomear(404L, 1L, true, "X"))
+            .isInstanceOf(RecursoNaoEncontradoException.class);
+    }
 }

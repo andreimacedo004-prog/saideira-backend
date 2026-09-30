@@ -3,6 +3,7 @@ package com.saideira.backend.controller;
 import com.saideira.backend.dto.CriarGrupoRequest;
 import com.saideira.backend.dto.EntrarNoGrupoRequest;
 import com.saideira.backend.dto.FriendGroupResponse;
+import com.saideira.backend.dto.RenomearGrupoRequest;
 import com.saideira.backend.security.UsuarioAutenticado;
 import com.saideira.backend.service.FriendGroupService;
 import jakarta.validation.Valid;
@@ -49,6 +50,16 @@ public class FriendGroupController {
         @AuthenticationPrincipal UsuarioAutenticado logado, @PathVariable Long grupoId
     ) {
         return ResponseEntity.ok(friendGroupService.detalhe(grupoId, logado.getId()));
+    }
+
+    /** So quem criou o grupo (ou o admin) muda o nome. */
+    @PatchMapping("/{grupoId}")
+    public ResponseEntity<FriendGroupResponse> renomear(
+        @AuthenticationPrincipal UsuarioAutenticado logado,
+        @PathVariable Long grupoId,
+        @Valid @RequestBody RenomearGrupoRequest request
+    ) {
+        return ResponseEntity.ok(friendGroupService.renomear(grupoId, logado.getId(), logado.isAdmin(), request.nome()));
     }
 
     /** Link pronto para o botao "chamar a galera" (Web Share API no PWA). So membros geram. */

@@ -6,6 +6,8 @@ import com.saideira.backend.exception.RecursoNaoEncontradoException;
 import com.saideira.backend.model.FriendGroup;
 import com.saideira.backend.model.User;
 import com.saideira.backend.repository.FriendGroupRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,8 @@ import java.util.List;
  */
 @Service
 public class FriendGroupService {
+
+    private static final Logger log = LoggerFactory.getLogger(FriendGroupService.class);
 
     // Sem vogais e sem caracteres ambiguos (0/O, 1/l) — codigo facil de ditar
     private static final String ALFABETO = "23456789bcdfghjkmnpqrstvwxz";
@@ -57,6 +61,30 @@ public class FriendGroupService {
         if (!grupo.temMembro(usuarioId)) {
             grupo.getMembros().add(userService.buscarPorId(usuarioId));
             grupo = friendGroupRepository.save(grupo);
+        }
+        return FriendGroupResponse.de(grupo);
+    }
+
+    /**
+     * Muda so o nome. Pode quem criou o grupo ou o admin (mesmo sem ser membro).
+     * Quem nao e do grupo recebe o mesmo 403 de sempre, sem saber quem criou.
+     */
+    @Transactional
+    public FriendGroupResponse renomear(Long grupoId, Long usuarioId, boolean admin, String nome) {
+        FriendGroup grupo = friendGroupRepository.findById(grupoId)
+            .orElseThrow(() -> new RecursoNaoEncontradoException("Grupo não encontrado"));
+
+        boolean criador = grupo.getCriadoPor().getId().equals(usuarioId);
+        if (!criador && !admin) {
+            if (!grupo.temMembro(usuarioId)) {
+                throw new AcessoNegadoException("Você não faz parte deste grupo");
+            }
+            throw new AcessoNegadoException("Só quem criou o grupo pode mudar o nome");
+        }
+
+        grupo.setNome(nome.trim());
+        if (!criador) {
+            log.info("Admin {} renomeou o grupo {}", usuarioId, grupoId);
         }
         return FriendGroupResponse.de(grupo);
     }
