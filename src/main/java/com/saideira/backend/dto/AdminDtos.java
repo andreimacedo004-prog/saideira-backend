@@ -39,7 +39,15 @@ public final class AdminDtos {
 
     public record Desafio(
         Long id, String nome, String grupoNome, DesafioResponse.Status status,
-        LocalDate dataInicio, LocalDate dataFim, int membros, long checkIns
+        LocalDate dataInicio, LocalDate dataFim, int membros, long checkIns,
+        Integer intervaloMinimoMinutos
+    ) {}
+
+    /** Minutos entre check-ins so neste desafio. Nulo volta ao padrao do app. */
+    public record NovoIntervalo(
+        @Min(value = 15, message = "O intervalo mínimo é de 15 minutos")
+        @Max(value = 1440, message = "O intervalo máximo é de 24 horas")
+        Integer minutos
     ) {}
 
     public record DesafioDetalhe(

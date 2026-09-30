@@ -251,7 +251,8 @@ public class AdminService {
                 DesafioResponse d = DesafioResponse.de(c, hoje);
                 return new AdminDtos.Desafio(
                     c.getId(), c.getNome(), c.getGrupo().getNome(), d.status(), c.getDataInicio(), c.getDataFim(),
-                    c.getGrupo().getMembros().size(), checkInsPorDesafio.getOrDefault(c.getId(), 0L)
+                    c.getGrupo().getMembros().size(), checkInsPorDesafio.getOrDefault(c.getId(), 0L),
+                    c.getIntervaloMinimoMinutos()
                 );
             })
             .toList();
@@ -332,6 +333,19 @@ public class AdminService {
             .orElseThrow(() -> new RecursoNaoEncontradoException("Ajuste não encontrado"));
         ajustePontosRepository.delete(ajuste);
         log.info("Admin {} desfez o ajuste {}", adminId, ajusteId);
+    }
+
+    /**
+     * Muda o intervalo entre check-ins so neste desafio (nulo = volta ao padrao).
+     * Vale para os proximos check-ins; os que ja existem ficam como estao.
+     */
+    @Transactional
+    public DesafioResponse definirIntervalo(Long desafioId, Long adminId, Integer minutos) {
+        Challenge desafio = buscarDesafio(desafioId);
+        desafio.setIntervaloMinimoMinutos(minutos);
+        log.info("Admin {} mudou o intervalo do desafio {} para {}", adminId, desafioId,
+            minutos == null ? "o padrao" : minutos + " min");
+        return DesafioResponse.de(desafio, LocalDate.now(clock));
     }
 
     /** Apaga o check-in de qualquer pessoa (reacoes e comentarios vao junto). */

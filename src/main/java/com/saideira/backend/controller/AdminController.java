@@ -1,6 +1,7 @@
 package com.saideira.backend.controller;
 
 import com.saideira.backend.dto.AdminDtos;
+import com.saideira.backend.dto.DesafioResponse;
 import com.saideira.backend.security.UsuarioAutenticado;
 import com.saideira.backend.service.AdminService;
 import jakarta.validation.Valid;
@@ -63,6 +64,15 @@ public class AdminController {
     @GetMapping("/desafios/{desafioId}")
     public ResponseEntity<AdminDtos.DesafioDetalhe> desafio(@PathVariable Long desafioId) {
         return ResponseEntity.ok(adminService.desafio(desafioId));
+    }
+
+    @PutMapping("/desafios/{desafioId}/intervalo")
+    public ResponseEntity<DesafioResponse> definirIntervalo(
+        @AuthenticationPrincipal UsuarioAutenticado admin,
+        @PathVariable Long desafioId,
+        @Valid @RequestBody AdminDtos.NovoIntervalo pedido
+    ) {
+        return ResponseEntity.ok(adminService.definirIntervalo(desafioId, admin.getId(), pedido.minutos()));
     }
 
     @PostMapping("/desafios/{desafioId}/ajustes")

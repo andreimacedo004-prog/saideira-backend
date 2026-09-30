@@ -99,7 +99,7 @@ public class CheckInService {
         LocalDateTime feitoEm = (req.feitoEm() != null ? req.feitoEm() : agora).truncatedTo(ChronoUnit.SECONDS);
 
         validarHorario(desafio, feitoEm, agora);
-        validarIntervalo(autorId, desafio.getId(), feitoEm);
+        validarIntervalo(autorId, desafio, feitoEm);
 
         CheckIn checkIn = new CheckIn();
         checkIn.setAutor(userService.buscarPorId(autorId));
@@ -241,13 +241,17 @@ public class CheckInService {
         }
     }
 
-    private void validarIntervalo(Long autorId, Long desafioId, LocalDateTime feitoEm) {
+    /** O desafio pode ter um intervalo proprio (definido pelo admin); senao vale o padrao. */
+    private void validarIntervalo(Long autorId, Challenge desafio, LocalDateTime feitoEm) {
+        Duration intervalo = desafio.getIntervaloMinimoMinutos() != null
+            ? Duration.ofMinutes(desafio.getIntervaloMinimoMinutos())
+            : intervaloMinimo;
         checkInRepository.findConflitante(
-            autorId, desafioId, feitoEm.minus(intervaloMinimo), feitoEm.plus(intervaloMinimo)
+            autorId, desafio.getId(), feitoEm.minus(intervalo), feitoEm.plus(intervalo)
         ).ifPresent(conflito -> {
             throw new IllegalArgumentException(
                 "Você já fez check-in às " + conflito.getFeitoEm().format(HORA)
-                + ". Precisa de pelo menos " + descrever(intervaloMinimo) + " entre um check-in e outro."
+                + ". Precisa de pelo menos " + descrever(intervalo) + " entre um check-in e outro."
             );
         });
     }

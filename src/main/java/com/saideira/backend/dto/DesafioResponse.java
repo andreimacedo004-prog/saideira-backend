@@ -13,7 +13,9 @@ public record DesafioResponse(
     LocalDate dataFim,
     Status status,
     // Para a tela saber se mostra "Editar desafio" (so quem criou pode)
-    Long criadoPorId
+    Long criadoPorId,
+    // Nulo = padrao do app (GET /api/regras). Preenchido quando o admin mudou so neste desafio.
+    Integer intervaloMinimoMinutos
 ) {
     public enum Status {
         EM_BREVE, ATIVO, ENCERRADO
@@ -31,7 +33,8 @@ public record DesafioResponse(
         return new DesafioResponse(
             c.getId(), c.getGrupo().getId(), c.getGrupo().getNome(),
             c.getNome(), c.getDataInicio(), c.getDataFim(), status,
-            c.getCriadoPor().getId()
+            c.getCriadoPor().getId(),
+            c.getIntervaloMinimoMinutos()
         );
     }
 }

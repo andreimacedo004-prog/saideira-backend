@@ -160,6 +160,31 @@ class CheckInServiceTest {
     }
 
     @Test
+    @DisplayName("Desafio com intervalo proprio (ex.: show com 30 min) usa a janela dele, nao a de 2h")
+    void intervaloDoDesafio() {
+        desafio.setIntervaloMinimoMinutos(30);
+
+        service.registrar(1L, 100L, pedido(null, null, null));
+
+        verify(checkInRepository).findConflitante(1L, 100L, AGORA.minusMinutes(30), AGORA.plusMinutes(30));
+    }
+
+    @Test
+    @DisplayName("No desafio de 30 min, a mensagem de recusa fala em 30min")
+    void mensagemComIntervaloDoDesafio() {
+        desafio.setIntervaloMinimoMinutos(30);
+        CheckIn anterior = new CheckIn();
+        anterior.setFeitoEm(AGORA.minusMinutes(20));
+        when(checkInRepository.findConflitante(eq(1L), eq(100L), any(), any())).thenReturn(Optional.of(anterior));
+
+        assertThatThrownBy(() -> service.registrar(1L, 100L, pedido(null, null, null)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("22:40")
+            .hasMessageContaining("pelo menos 30min");
+        verify(checkInRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Check-in no futuro e recusado (alem da tolerancia de 5 min)")
     void recusaFuturo() {
         assertThatThrownBy(() -> service.registrar(1L, 100L, pedido(AGORA.plusMinutes(30), null, null)))

@@ -18,7 +18,7 @@ src/main/java/com/saideira/backend/
 ├── exception/    → Tratamento centralizado de erros
 └── util/         → Normalizador de texto
 
-src/main/resources/db/migration/ → Migrations Flyway (V1 esquema, V2 catálogo de cervejas, V3 formato e quantidade, V4 ajustes de pontos do admin)
+src/main/resources/db/migration/ → Migrations Flyway (V1 esquema, V2 catálogo de cervejas, V3 formato e quantidade, V4 ajustes de pontos do admin, V5 intervalo por desafio)
 src/test/java/                   → Testes unitários
 testar_saideira.ps1              → Passeio completo pela API, em PowerShell
 ```
@@ -66,7 +66,7 @@ Cada cerveja do check-in vai com **formato** (`LATA` 350 ml, `LATAO` 473, `LONG_
 
 ### Anti-farm
 
-- Intervalo mínimo de **2h** entre check-ins da mesma pessoa no mesmo desafio (`CHECKIN_INTERVALO_MINUTOS`)
+- Intervalo mínimo de **2h** entre check-ins da mesma pessoa no mesmo desafio (`CHECKIN_INTERVALO_MINUTOS`). O admin pode mudar só num desafio (de 15 min a 24h), ex.: 30 min no desafio de um show
 - Check-in retroativo de até **24h** (para quem esqueceu na hora), nunca no futuro
 - No máximo **5 cervejas** por check-in
 - Só dá para marcar quem é do grupo, e ninguém se marca
@@ -94,7 +94,7 @@ Tudo exige `Authorization: Bearer <token>`, exceto `/api/auth/**`, `/api/health`
 | POST | `/api/grupos/{id}/desafios` | Cria desafio (`nome`, `dataInicio`, `dataFim`) |
 | GET | `/api/grupos/{id}/desafios` | Desafios do grupo |
 | GET | `/api/desafios` | Desafios de todos os meus grupos, ativos primeiro (tela inicial) |
-| GET | `/api/desafios/{id}` | Detalhe, com status `EM_BREVE` / `ATIVO` / `ENCERRADO` e `criadoPorId` |
+| GET | `/api/desafios/{id}` | Detalhe, com status `EM_BREVE` / `ATIVO` / `ENCERRADO`, `criadoPorId` e `intervaloMinimoMinutos` (nulo = padrão de `/api/regras`) |
 | PATCH | `/api/desafios/{id}` | Muda o nome (`nome`). Só quem criou; as datas não mudam |
 | DELETE | `/api/desafios/{id}` | Apaga o desafio. Só quem criou; leva junto check-ins, reações e comentários (cascade no banco) |
 | GET | `/api/desafios/{id}/ranking` | Ranking com o detalhe dos pontos |
@@ -153,6 +153,7 @@ Quem está em `APP_ADMIN_EMAILS` (lista separada por vírgula) entra no app norm
 | POST | `/api/admin/usuarios/{id}/senha-temporaria` | Gera uma senha nova para quem esqueceu e libera o bloqueio de login |
 | GET | `/api/admin/desafios` | Todos os desafios, de todos os grupos |
 | GET | `/api/admin/desafios/{id}` | Ranking, check-ins, ajustes e participantes (admin não precisa ser do grupo) |
+| PUT | `/api/admin/desafios/{id}/intervalo` | Intervalo entre check-ins só neste desafio (`minutos`, 15 a 1440; nulo volta ao padrão). Vale para os próximos check-ins |
 | POST | `/api/admin/desafios/{id}/ajustes` | Soma ou tira pontos (`usuarioId`, `pontos`, `motivo`) |
 | DELETE | `/api/admin/ajustes/{id}` | Desfaz um ajuste |
 | DELETE | `/api/admin/checkins/{id}` | Apaga o check-in de qualquer pessoa |

@@ -45,6 +45,10 @@ public class Challenge {
 
     private LocalDateTime criadoEm = LocalDateTime.now();
 
+    // Minutos entre dois check-ins da mesma pessoa. Nulo = padrao do app (2h).
+    // So o admin muda (ex.: 30 min no desafio de um show).
+    private Integer intervaloMinimoMinutos;
+
     public boolean contem(LocalDate dia) {
         return !dia.isBefore(dataInicio) && !dia.isAfter(dataFim);
     }
